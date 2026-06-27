@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+{% block title %}Manager Intervention · CRM{% endblock %}
+
+{% block content %}
+<section class="hero-ribbon">
+  <div>
+    <h1 class="page-title" data-i18n="crm.intervention.inbox"></h1>
+    <p class="page-subtitle text-muted" data-i18n="crm.intervention.subtitle"></p>
+  </div>
+  <div class="hero-actions">
+    <a href="/marketing" class="btn btn-ghost">
+      <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+      <span data-i18n="common.back"></span>
+    </a>
+  </div>
+</section>
+
+<!-- Inbox stats — quick read on what's in queue. Values populated from
+     /api/crm/intervention's `stats` block so we don't need a 2nd round-trip. -->
+<div class="stats-grid" style="margin-bottom:20px">
+  <div class="kpi-tile">
+    <span class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">mark_email_unread</span></span>
+    <span class="kpi-tile-label" data-i18n="crm.intervention.stat.open_total"></span>
+    <span class="kpi-tile-value" id="invStatOpen">—</span>
+  </div>
+  <div class="kpi-tile">
+    <span class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">priority_high</span></span>
+    <span class="kpi-tile-label" data-i18n="crm.intervention.stat.high"></span>
+    <span class="kpi-tile-value" id="invStatHigh">—</span>
+  </div>
+  <div class="kpi-tile">
+    <span class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">warning</span></span>
+    <span class="kpi-tile-label" data-i18n="crm.intervention.stat.medium"></span>
+    <span class="kpi-tile-value" id="invStatMedium">—</span>
+  </div>
+  <div class="kpi-tile">
+    <span class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">task_alt</span></span>
+    <span class="kpi-tile-label" data-i18n="crm.intervention.stat.reviewed_7d"></span>
+    <span class="kpi-tile-value" id="invStatReviewed" style="font-size:18px">—</span>
+  </div>
+  <div class="kpi-tile">
+    <span class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">check_circle</span></span>
+    <span class="kpi-tile-label" data-i18n="crm.intervention.stat.closed_7d"></span>
+    <span class="kpi-tile-value" id="invStatClosed" style="font-size:18px">—</span>
+  </div>
+</div>
+
+<!-- Filter bar — same controls as the in-campaign tab plus a campaign picker. -->
+<div class="glass-card" style="padding:14px 18px;margin-bottom:18px">
+  <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap">
+    <div class="field" style="min-width:200px;margin:0">
+      <label data-i18n="crm.marketing.col.campaign"></label>
+      <select id="invCampaignFilter" onchange="loadInbox()">
+        <option value="all" data-i18n="common.all"></option>
+      </select>
+    </div>
+    <div class="field" style="min-width:140px;margin:0">
+      <label data-i18n="crm.intervention.filter.status"></label>
+      <select id="invStatusFilter" onchange="loadInbox()">
+        <option value="OPEN" data-i18n="crm.intervention.status.open"></option>
+        <option value="REVIEWED" data-i18n="crm.intervention.status.reviewed"></option>
+        <option value="CLOSED" data-i18n="crm.intervention.status.closed"></option>
+        <option value="all" data-i18n="common.all"></option>
+      </select>
+    </div>
+    <div class="field" style="min-width:140px;margin:0">
+      <label data-i18n="crm.intervention.filter.priority"></label>
+      <select id="invPriorityFilter" onchange="loadInbox()">
+        <option value="all" data-i18n="common.all"></option>
+        <option value="HIGH" data-i18n="crm.intervention.priority.high"></option>
+        <option value="MEDIUM" data-i18n="crm.intervention.priority.medium"></option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Cards container -->
+<div id="invList" class="iv-grid"></div>
+<div id="invEmpty" class="glass-card" style="padding:48px;text-align:center" hidden>
+  <span class="material-symbols-outlined" aria-hidden="true" style="font-size:48px;color:var(--text-dim)">inbox</span>
+  <h3 style="margin-top:12px" data-i18n="crm.intervention.empty"></h3>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let inboxData = null;
+let campaignList = [];
+
+async function loadCampaignList() {
+  // Used to populate the filter dropdown. Reuses the existing summary
+  // endpoint so we don't add a 2nd "list campaigns" surface.
+  try {
+    campaignList = await api("/api/crm/campaigns-summary");
+    const sel = document.getElementById("invCampaignFilter");
+    campaignList.forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = String(c.campaign_id);
+      opt.textContent = c.campaign_name;
+      sel.appendChild(opt);
+    });
+  } catch (e) {
+    console.warn("campaigns-summary failed:", e);
+  }
+}
+
+async function loadInbox() {
+  const params = new URLSearchParams();
+  const status = document.getElementById("invStatusFilter").value;
+  const priority = document.getElementById("invPriorityFilter").value;
+  const campaign = document.getElementById("invCampaignFilter").value;
+  params.set("status", status);
+  if (priority) params.set("priority", priority);
+  if (campaign && campaign !== "all") params.set("campaign_id", campaign);
+
+  try {
+    inboxData = await api(`/api/crm/intervention?${params.toString()}`);
+    renderInbox();
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+function renderInbox() {
+  if (!inboxData) return;
+  const s = inboxData.stats || {};
+  document.getElementById("invStatOpen").textContent     = fmtNum(s.open_total);
+  document.getElementById("invStatHigh").textContent     = fmtNum(s.open_high);
+  document.getElementById("invStatMedium").textContent   = fmtNum(s.open_medium);
+  document.getElementById("invStatReviewed").textContent = fmtNum(s.reviewed_7d);
+  document.getElementById("invStatClosed").textContent   = fmtNum(s.closed_7d);
+
+  const rows = inboxData.rows || [];
+  const list = document.getElementById("invList");
+  const empty = document.getElementById("invEmpty");
+  list.innerHTML = "";
+  if (!rows.length) {
+    list.style.display = "none";
+    empty.hidden = false;
+    return;
+  }
+  list.style.display = "grid";
+  empty.hidden = true;
+  rows.forEach(r => list.appendChild(buildInterventionCard(r, true)));
+}
+
+// Shared card builder — same shape used by the in-campaign tab (and by
+// loading this template lazily we get a free preview of the layout). The
+// `showCampaign` flag toggles the campaign-name line so the in-campaign
+// tab can hide what it already shows in its header.
+function buildInterventionCard(r, showCampaign) {
+  const li = document.createElement("article");
+  li.className = "iv-card iv-pri-" + (r.priority || "").toLowerCase();
+  const priorityClass = r.priority === "HIGH" ? "is-high" : "is-medium";
+  const recKey = r.trigger_type === "NO_ANSWER_AFTER_MEETING"
+    ? "crm.intervention.recommendation.meeting"
+    : "crm.intervention.recommendation.following";
+  const triggerKey = "crm.intervention.trigger." + (r.trigger_type || "").toLowerCase();
+  const statusClass = "status-" + (r.status || "OPEN").toLowerCase();
+
+  const campaignLine = showCampaign && r.campaign_name
+    ? `<a href="/marketing/campaigns/${r.campaign_id}" class="iv-campaign-tag">${escapeHtml(r.campaign_name)}</a>`
+    : "";
+
+  li.innerHTML = `
+    <div class="iv-card-head">
+      <span class="iv-priority ${priorityClass}">${escapeHtml(t("crm.intervention.priority." + (r.priority || "").toLowerCase()))}</span>
+      ${campaignLine}
+      <span class="iv-status ${statusClass}">${escapeHtml(t("crm.intervention.status." + (r.status || "OPEN").toLowerCase()))}</span>
+    </div>
+    <h3 class="iv-client">${escapeHtml(r.client_name || r.mobile || "—")}</h3>
+    <p class="iv-mobile">${escapeHtml(r.mobile || "")}</p>
+    <div class="iv-trigger">${escapeHtml(t(triggerKey))}</div>
+    <p class="iv-rec">${escapeHtml(t(recKey))}</p>
+    <dl class="iv-meta">
+      <dt data-i18n="crm.timeline.current_rep">${escapeHtml(t("crm.timeline.current_rep"))}</dt>
+      <dd>${escapeHtml(r.current_sales_rep_name || "—")}</dd>
+      <dt data-i18n="crm.intervention.last_positive_date">${escapeHtml(t("crm.intervention.last_positive_date"))}</dt>
+      <dd>${escapeHtml(fmtDateShort(r.last_positive_stage_date))}</dd>
+      <dt data-i18n="crm.intervention.last_no_answer_date">${escapeHtml(t("crm.intervention.last_no_answer_date"))}</dt>
+      <dd>${escapeHtml(fmtDateShort(r.last_no_answer_date))}</dd>
+      ${r.last_comment ? `<dt data-i18n="crm.intervention.last_comment">${escapeHtml(t("crm.intervention.last_comment"))}</dt>
+      <dd class="iv-comment">${escapeHtml(r.last_comment)}</dd>` : ""}
+    </dl>
+    <div class="iv-actions">
+      <a class="btn btn-sm btn-ghost" href="/marketing/campaigns/${r.campaign_id}/leads/${r.lead_id}">
+        <span data-i18n="crm.intervention.action.open_timeline">${escapeHtml(t("crm.intervention.action.open_timeline"))}</span>
+      </a>
+      ${r.status !== "REVIEWED" ? `<button class="btn btn-sm" data-action="REVIEWED" data-id="${r.id}">
+        <span data-i18n="crm.intervention.action.mark_reviewed">${escapeHtml(t("crm.intervention.action.mark_reviewed"))}</span>
+      </button>` : ""}
+      ${r.status !== "CLOSED" ? `<button class="btn btn-sm btn-primary" data-action="CLOSED" data-id="${r.id}">
+        <span data-i18n="crm.intervention.action.close">${escapeHtml(t("crm.intervention.action.close"))}</span>
+      </button>` : ""}
+      ${r.status !== "OPEN" ? `<button class="btn btn-sm btn-ghost" data-action="OPEN" data-id="${r.id}">
+        <span data-i18n="crm.intervention.action.reopen">${escapeHtml(t("crm.intervention.action.reopen"))}</span>
+      </button>` : ""}
+    </div>
+  `;
+  li.querySelectorAll("button[data-action]").forEach(b => {
+    b.addEventListener("click", async (e) => {
+      const action = e.currentTarget.getAttribute("data-action");
+      const id = parseInt(e.currentTarget.getAttribute("data-id"), 10);
+      try {
+        await api(`/api/crm/intervention/${id}`, { method: "PATCH", body: { status: action } });
+        toast(t("common.saved"), "success");
+        await loadInbox();
+        if (typeof refreshInterventionBadge === "function") refreshInterventionBadge();
+      } catch (err) { toastError(err); }
+    });
+  });
+  return li;
+}
+
+function fmtNum(n) {
+  if (n == null) return "—";
+  try { return Number(n).toLocaleString(); } catch (_) { return String(n); }
+}
+function fmtDateShort(iso) {
+  if (!iso) return "—";
+  try {
+    return new Intl.DateTimeFormat(getLang() === "ar" ? "ar-EG" : "en-GB",
+      { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));
+  } catch (_) { return iso; }
+}
+function escapeHtml(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function onLangChange() { renderInbox(); }
+
+(async function init() {
+  await loadCampaignList();
+  await loadInbox();
+})();
+</script>
+
+<style>
+  .iv-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 14px;
+  }
+  .iv-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    box-shadow: var(--shadow-xs);
+    border-inline-start: 3px solid var(--text-dim);
+  }
+  .iv-card.iv-pri-high   { border-inline-start-color: var(--danger);  }
+  .iv-card.iv-pri-medium { border-inline-start-color: var(--warning); }
+
+  .iv-card-head {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .iv-priority {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+    padding: 2px 10px; border-radius: 9999px; text-transform: uppercase;
+  }
+  .iv-priority.is-high   { background: rgba(186,26,26,0.10); color: var(--danger); }
+  .iv-priority.is-medium { background: rgba(196,114,0,0.12); color: var(--warning); }
+  .iv-campaign-tag {
+    font-size: 11px; font-weight: 600;
+    color: var(--text-muted); background: var(--surface-recessed);
+    border: 1px solid var(--border); border-radius: 9999px;
+    padding: 2px 10px; text-decoration: none;
+  }
+  .iv-campaign-tag:hover { color: var(--brand); border-color: rgba(71,77,197,0.32); }
+  .iv-status {
+    margin-inline-start: auto;
+    font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 9999px;
+    background: var(--surface-recessed); color: var(--text-muted);
+  }
+  .iv-status.status-open     { background: rgba(186,26,26,0.10); color: var(--danger); }
+  .iv-status.status-reviewed { background: rgba(196,114,0,0.12); color: var(--warning); }
+  .iv-status.status-closed   { background: rgba(0,103,98,0.10); color: var(--accent-2); }
+
+  .iv-client { font-size: 16px; font-weight: 700; margin: 0 0 2px; }
+  .iv-mobile { font-size: 13px; color: var(--text-muted); margin: 0 0 12px; }
+  .iv-trigger { font-size: 12px; font-weight: 600; color: var(--brand); margin-bottom: 6px; }
+  .iv-rec { font-size: 13px; color: var(--text-muted); margin: 0 0 14px; line-height: 1.55; }
+
+  .iv-meta {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 4px 12px;
+    margin: 0 0 14px;
+    font-size: 12px;
+  }
+  .iv-meta dt { color: var(--text-muted); font-weight: 600; }
+  .iv-meta dd { margin: 0; color: var(--text); }
+  .iv-comment { white-space: normal; line-height: 1.55; }
+
+  .iv-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+</style>
+{% endblock %}

@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+{% block title %}CRM Reports · Ain{% endblock %}
+
+{% block content %}
+<section class="hero-ribbon">
+  <div>
+    <h1 class="page-title" data-i18n="nav.crm_reports"></h1>
+    <p class="page-subtitle" data-i18n="crm.reports.subtitle"></p>
+  </div>
+</section>
+
+<!-- Campaign card list -->
+<div id="crmCampaignList">
+  <div class="glass-card" style="padding:24px;text-align:center">
+    <span class="loading"></span>
+  </div>
+</div>
+
+<!-- Upload modal -->
+<div class="modal-backdrop" id="crmUploadModal" role="dialog" aria-modal="true" aria-labelledby="crmUploadTitle">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="crmUploadTitle" data-i18n="crm.upload.title"></div>
+      <button class="modal-close" onclick="closeModal('crmUploadModal')" data-i18n-aria-label="common.close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-muted" id="crmUploadCampaignLabel" style="margin-bottom:10px;font-weight:600"></p>
+      <div id="crmUploadIdle">
+        <p class="text-muted" style="margin-bottom:10px" data-i18n="crm.upload.choose_file"></p>
+        <input type="file" id="crmUploadFile" accept=".xlsx"
+               style="width:100%;padding:10px;border:1px dashed var(--border);border-radius:var(--radius-sm)">
+        <p class="text-dim" style="font-size:12px;margin-top:8px" data-i18n="crm.upload.cap_hint"></p>
+      </div>
+      <div id="crmUploadRunning" hidden>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="loading"></span>
+          <span data-i18n="crm.upload.processing"></span>
+        </div>
+        <p class="text-muted" style="margin-top:8px;font-size:13px" id="crmUploadProgress"></p>
+      </div>
+      <div id="crmUploadResult" hidden>
+        <div class="upload-result-banner" id="crmUploadBanner"></div>
+        <dl class="upload-summary-grid" id="crmUploadSummary"></dl>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="crmUploadCancel" class="btn btn-ghost" onclick="closeModal('crmUploadModal')"
+              data-i18n="common.cancel"></button>
+      <button id="crmUploadGo" class="btn btn-primary" onclick="crmDoUpload()"
+              data-i18n="crm.upload.button"></button>
+      <button id="crmUploadDone" class="btn btn-primary" onclick="crmFinishUpload()" hidden
+              data-i18n="common.ok"></button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+  /* Upload modal styles */
+  .upload-result-banner {
+    padding: 12px 14px; border-radius: var(--radius-sm);
+    margin-bottom: 14px; font-weight: 500;
+  }
+  .upload-result-banner.is-success {
+    background: rgba(0,131,124,0.08); color: var(--accent-2);
+    border: 1px solid rgba(0,131,124,0.32);
+  }
+  .upload-result-banner.is-error {
+    background: var(--danger-soft); color: var(--danger);
+    border: 1px solid rgba(186,26,26,0.25);
+  }
+  .upload-summary-grid {
+    display: grid; grid-template-columns: 1fr auto;
+    row-gap: 6px; column-gap: 16px; margin: 0;
+  }
+  .upload-summary-grid dt { color: var(--text-muted); font-size: 13px; }
+  .upload-summary-grid dd { margin: 0; font-weight: 600; }
+
+  /* Campaign card list */
+  #crmCampaignList { display: flex; flex-direction: column; gap: 12px; }
+  .crm-report-card {
+    display: flex; align-items: center; gap: 16px;
+    padding: 16px 20px; flex-wrap: wrap;
+  }
+  .crm-report-card-left {
+    display: flex; align-items: center; gap: 14px; flex: 1; min-width: 200px;
+  }
+  .crm-report-icon {
+    width: 44px; height: 44px; border-radius: var(--radius-sm);
+    background: rgba(71,77,197,0.1);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  [data-theme="light"] .crm-report-icon { background: rgba(71,77,197,0.08); }
+  .crm-report-icon .material-symbols-outlined { font-size: 22px; color: var(--brand); }
+  .crm-report-name { font-weight: 600; font-size: 15px; color: var(--text); margin-bottom: 3px; }
+  .crm-report-meta {
+    font-size: 12px; color: var(--text-muted);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .crm-report-date { font-weight: 500; color: var(--text); }
+  .crm-report-card-stats { display: flex; gap: 28px; align-items: center; }
+  .crm-report-stat { text-align: center; min-width: 64px; }
+  .crm-report-stat-val {
+    display: block; font-weight: 700; font-size: 20px;
+    color: var(--text); font-family: var(--font-display);
+  }
+  .crm-report-stat-lbl {
+    display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .crm-report-card-actions { display: flex; gap: 8px; align-items: center; }
+  @media (max-width: 700px) {
+    .crm-report-card { padding: 12px 14px; }
+    .crm-report-card-stats { gap: 16px; }
+    .crm-report-card-actions { width: 100%; justify-content: flex-end; }
+  }
+</style>
+<script>
+let crmCampaignList = [];
+let crmUploadTargetId = null;
+let crmPollTimer = null;
+let crmPollTries = 0;
+
+// ─── Load & render ────────────────────────────────────────────────────
+async function loadCrmSummary() {
+  try {
+    crmCampaignList = await api("/api/crm/campaigns-summary");
+    renderCrmCards();
+  } catch (e) {
+    const wrap = document.getElementById("crmCampaignList");
+    if (wrap) wrap.innerHTML = `<div class="glass-card" style="padding:24px;text-align:center;color:var(--danger)">${escapeHtml(tError(e))}</div>`;
+  }
+}
+
+function renderCrmCards() {
+  const wrap = document.getElementById("crmCampaignList");
+  if (!wrap) return;
+
+  if (!crmCampaignList.length) {
+    wrap.innerHTML = `<div class="glass-card" style="padding:48px;text-align:center">
+      <span class="material-symbols-outlined" style="font-size:48px;color:var(--text-dim)">cloud_off</span>
+      <p class="text-muted" style="margin-top:10px" data-i18n="mk.empty_state"></p>
+    </div>`;
+    applyLang(true);
+    return;
+  }
+
+  const lang = getLang();
+  const fmt = new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-GB",
+    { day: "2-digit", month: "short", year: "numeric" });
+
+  wrap.innerHTML = "";
+  crmCampaignList.forEach(c => {
+    const lastUp = c.last_upload_at ? fmt.format(new Date(c.last_upload_at)) : "—";
+    const hasIntervention = c.open_intervention > 0;
+    const interventionBadge = hasIntervention
+      ? `<span style="background:rgba(196,114,0,0.12);color:var(--warning);
+               font-weight:700;padding:3px 10px;border-radius:9999px;font-size:13px">${c.open_intervention}</span>`
+      : `<span style="color:var(--text-dim);font-weight:700;font-size:20px;font-family:var(--font-display)">0</span>`;
+
+    const card = document.createElement("div");
+    card.className = "crm-report-card glass-card";
+    card.innerHTML = `
+      <div class="crm-report-card-left">
+        <div class="crm-report-icon">
+          <span class="material-symbols-outlined" aria-hidden="true">campaign</span>
+        </div>
+        <div class="crm-report-info">
+          <div class="crm-report-name">${escapeHtml(c.campaign_name)}</div>
+          <div class="crm-report-meta">
+            <span class="material-symbols-outlined" style="font-size:13px" aria-hidden="true">schedule</span>
+            <span data-i18n="crm.marketing.col.last_upload"></span>:&nbsp;<span class="crm-report-date">${escapeHtml(lastUp)}</span>
+          </div>
+        </div>
+      </div>
+      <div class="crm-report-card-stats">
+        <div class="crm-report-stat">
+          <span class="crm-report-stat-val">${(c.total_leads || 0).toLocaleString()}</span>
+          <span class="crm-report-stat-lbl" data-i18n="crm.marketing.col.leads"></span>
+        </div>
+        <div class="crm-report-stat">
+          <span class="crm-report-stat-val">${interventionBadge}</span>
+          <span class="crm-report-stat-lbl" data-i18n="crm.marketing.col.intervention"></span>
+        </div>
+      </div>
+      <div class="crm-report-card-actions">
+        <a class="btn btn-sm" href="/marketing/campaigns/${c.campaign_id}" data-i18n="crm.marketing.action.open"></a>
+        <button class="btn btn-sm btn-primary" data-camp="${c.campaign_id}"
+                data-name="${escapeHtml(c.campaign_name)}"
+                data-i18n="crm.marketing.action.upload"></button>
+      </div>
+    `;
+    card.querySelector("button[data-camp]").addEventListener("click", e => {
+      const btn = e.currentTarget;
+      crmOpenUpload(parseInt(btn.getAttribute("data-camp"), 10), btn.getAttribute("data-name"));
+    });
+    wrap.appendChild(card);
+  });
+  applyLang(true);
+}
+
+// ─── Upload modal ─────────────────────────────────────────────────────
+function crmOpenUpload(campaignId, campaignName) {
+  crmUploadTargetId = campaignId;
+  document.getElementById("crmUploadCampaignLabel").textContent = campaignName || "";
+  crmResetUploadModal();
+  openModal("crmUploadModal");
+}
+
+function crmResetUploadModal() {
+  document.getElementById("crmUploadFile").value = "";
+  document.getElementById("crmUploadIdle").hidden = false;
+  document.getElementById("crmUploadRunning").hidden = true;
+  document.getElementById("crmUploadResult").hidden = true;
+  document.getElementById("crmUploadGo").hidden = false;
+  document.getElementById("crmUploadGo").disabled = false;
+  document.getElementById("crmUploadCancel").hidden = false;
+  document.getElementById("crmUploadDone").hidden = true;
+  document.getElementById("crmUploadBanner").className = "upload-result-banner";
+  document.getElementById("crmUploadBanner").textContent = "";
+  document.getElementById("crmUploadSummary").innerHTML = "";
+}
+
+async function crmDoUpload() {
+  const fileInput = document.getElementById("crmUploadFile");
+  const file = fileInput.files && fileInput.files[0];
+  if (!file || !crmUploadTargetId) { toast(t("errors.required_fields_missing"), "error"); return; }
+  if (!file.name.toLowerCase().endsWith(".xlsx")) { toast(t("crm.upload.bad_type"), "error"); return; }
+
+  document.getElementById("crmUploadIdle").hidden = true;
+  document.getElementById("crmUploadRunning").hidden = false;
+  document.getElementById("crmUploadGo").disabled = true;
+
+  const fd = new FormData();
+  fd.append("file", file);
+  let uploadId = null;
+  try {
+    let csrf = window._CSRF || null;
+    if (!csrf) {
+      try { const me = await fetch("/api/auth/me", { credentials: "same-origin" });
+            const mj = await me.json(); csrf = mj.csrf || null; } catch (_) {}
+    }
+    const r = await fetch(`/api/crm/campaigns/${crmUploadTargetId}/upload`, {
+      method: "POST", credentials: "same-origin",
+      headers: csrf ? { "X-CSRF-Token": csrf } : {}, body: fd,
+    });
+    const data = await r.json();
+    if (!r.ok) throw { data, status: r.status };
+    uploadId = data.upload_id;
+  } catch (e) {
+    document.getElementById("crmUploadRunning").hidden = true;
+    document.getElementById("crmUploadIdle").hidden = false;
+    document.getElementById("crmUploadGo").disabled = false;
+    toastError(e); return;
+  }
+  crmPollTries = 0;
+  crmPollTimer = setInterval(() => crmPoll(uploadId), 2000);
+}
+
+async function crmPoll(uploadId) {
+  crmPollTries += 1;
+  if (crmPollTries > 60) {
+    clearInterval(crmPollTimer); crmPollTimer = null;
+    crmShowResult({ status: "FAILED", error_message: t("crm.upload.timeout") || "Timed out" });
+    return;
+  }
+  try {
+    const s = await api(`/api/crm/uploads/${uploadId}/status`);
+    if (s.status === "COMPLETED" || s.status === "FAILED") {
+      clearInterval(crmPollTimer); crmPollTimer = null;
+      crmShowResult(s);
+    } else {
+      document.getElementById("crmUploadProgress").textContent =
+        `${t("crm.upload.processing")} (${crmPollTries}/60)`;
+    }
+  } catch (e) {
+    clearInterval(crmPollTimer); crmPollTimer = null;
+    crmShowResult({ status: "FAILED", error_message: tError(e) });
+  }
+}
+
+function crmShowResult(s) {
+  document.getElementById("crmUploadRunning").hidden = true;
+  document.getElementById("crmUploadResult").hidden = false;
+  document.getElementById("crmUploadGo").hidden = true;
+  document.getElementById("crmUploadCancel").hidden = true;
+  document.getElementById("crmUploadDone").hidden = false;
+  const banner = document.getElementById("crmUploadBanner");
+  if (s.status === "FAILED") {
+    banner.className = "upload-result-banner is-error";
+    banner.textContent = s.error_message || t("crm.upload.failed");
+    return;
+  }
+  banner.className = "upload-result-banner is-success";
+  banner.textContent = t("crm.upload.completed");
+  const grid = document.getElementById("crmUploadSummary");
+  grid.innerHTML = "";
+  [["crm.upload.summary.total_events", s.total_events],
+   ["crm.upload.summary.new_events",   s.new_events],
+   ["crm.upload.summary.duplicates",   s.duplicate_events]].forEach(([k, v]) => {
+    const dt = document.createElement("dt"); dt.setAttribute("data-i18n", k); dt.textContent = t(k);
+    const dd = document.createElement("dd"); dd.textContent = (v || 0).toLocaleString();
+    grid.appendChild(dt); grid.appendChild(dd);
+  });
+}
+
+function crmFinishUpload() {
+  closeModal("crmUploadModal");
+  loadCrmSummary();
+}
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+// ─── Lifecycle ────────────────────────────────────────────────────────
+function onLangChange() { renderCrmCards(); }
+
+loadCrmSummary();
+</script>
+{% endblock %}

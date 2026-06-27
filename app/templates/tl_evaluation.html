@@ -1,0 +1,683 @@
+{% extends "base.html" %}
+{% block title %}Ain KPI{% endblock %}
+
+{% block head %}
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title" data-i18n="tl_eval.title"></h1>
+    <p class="page-subtitle" data-i18n="tl_eval.subtitle"></p>
+  </div>
+</div>
+
+<div class="controls controls-sticky">
+  <div class="field">
+    <label data-i18n="common.month"></label>
+    <div id="dateRangeHost"></div>
+  </div>
+  <div class="field">
+    <label data-i18n="filters.team"></label>
+    <select id="teamFilter" onchange="onSearchInput()">
+      <option value="" data-i18n="common.all"></option>
+      <option value="none" data-i18n="filters.no_team"></option>
+    </select>
+  </div>
+  <div class="field">
+    <label data-i18n="common.filter"></label>
+    <select id="statusFilter" onchange="onSearchInput()">
+      <option value="" data-i18n="common.all"></option>
+      <option value="done" data-i18n="tl_eval.evaluated"></option>
+      <option value="pending" data-i18n="tl_eval.pending"></option>
+    </select>
+  </div>
+  <div class="field" style="flex:1;min-width:180px">
+    <label data-i18n="common.search"></label>
+    <input type="text" id="searchBox" oninput="onSearchInput()" data-i18n-placeholder="filters.search_user_ph" autocomplete="off">
+  </div>
+  <div class="field" style="align-self:flex-end">
+    <button class="btn btn-ghost btn-sm" onclick="resetFilters()" data-i18n="filters.reset"></button>
+  </div>
+  <div class="spacer"></div>
+  <div id="progress" class="text-muted" style="font-size:13px;font-weight:600"></div>
+</div>
+
+<!-- Contextual range warning — sub-month notice. -->
+<div class="dr-context-warning-host" id="rangeWarningHost" aria-live="polite">
+  <div class="dr-context-warning" id="rangeWarning" hidden>
+    <span class="material-symbols-outlined" aria-hidden="true">warning</span>
+    <div class="dr-context-warning-text" id="rangeWarningText"></div>
+  </div>
+</div>
+
+<div id="chipsRow" class="pf-chips" style="margin-bottom:12px"></div>
+
+<!-- Teams Performance row: ranking + composition donut -->
+<div class="bento">
+  <div class="chart-card span-8">
+    <h3 data-i18n="tl_eval.teams_perf"></h3>
+    <div id="chartTeamsRanking" class="plotly-container"></div>
+  </div>
+  <div class="chart-card span-4">
+    <h3 data-i18n="tl_eval.teams_perf_hint"></h3>
+    <div id="chartTeamsComposition" class="plotly-container"></div>
+  </div>
+</div>
+
+<!-- Per-team aggregate cards -->
+<div class="card reveal" id="teamsPerfCard">
+  <div class="card-title">
+    <span data-i18n="tl_eval.teams_perf"></span>
+    <span class="text-muted" style="font-size:11px;margin-inline-start:8px" data-i18n="tl_eval.teams_perf_hint"></span>
+  </div>
+  <div id="teamsPerfGrid" class="pf-grid">
+    <div class="pf-empty"><span class="loading"></span></div>
+  </div>
+</div>
+
+<div class="card-title mb-2" style="margin-top:12px">
+  <span data-i18n="tl_eval.title"></span>
+</div>
+<div id="list" class="stagger"></div>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="evalModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle"></div>
+      <button class="modal-close" onclick="closeModal('evalModal')" data-i18n-aria-label="common.close">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="saveEval()" data-i18n="tl_eval.save"></button>
+      <button class="btn btn-ghost" onclick="closeModal('evalModal')" data-i18n="common.cancel"></button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}?v=flat51"></script>
+<script src="{{ url_for('static', filename='js/date_range.js') }}?v=flat51"></script>
+<script>
+let leaders = [];
+let teams = [];
+let teamsPerf = [];
+let unassignedSummary = { member_count: 0, members_submitted: 0, members_evaluated: 0, members: [] };
+let currentTL = null;
+let tlKpiData = null;
+let _drCtrl = null;
+let _drFallbackArmed = true;  // auto-widen to YTD on empty first load
+
+async function loadAll() {
+  if (!_drCtrl) return;
+  const qs = _drCtrl.toQueryString();
+  try {
+    const [ls, ts, tp] = await Promise.all([
+      api(`/api/kpi/team-leaders?${qs}`),
+      teams.length ? Promise.resolve(teams) : api("/api/teams").catch(() => []),
+      api(`/api/kpi/teams-summary?${qs}`).catch(() => ({ teams: [], unassigned: null })),
+    ]);
+    // Empty signal: no leader evaluated AND no team has activity in range.
+    // Falls back to YTD once on first paint so the page isn't blank.
+    const evaluatedAny = Array.isArray(ls) && ls.some(l => l.dataentry_submitted_at);
+    const tpArr = Array.isArray(tp) ? tp : (tp.teams || []);
+    const activityAny = tpArr.some(p => (p.members_evaluated || 0) > 0 || (p.total_deals || 0) > 0);
+    if (_drFallbackArmed && !evaluatedAny && !activityAny
+        && _drCtrl.getRange().preset !== "ytd") {
+      _drFallbackArmed = false;
+      _drCtrl.setRange({ preset: "ytd" });
+      return;
+    }
+    _drFallbackArmed = false;
+    leaders = ls;
+    teams = ts || [];
+    // teams-summary now returns {teams, unassigned}; tolerate either shape.
+    teamsPerf = tpArr;
+    unassignedSummary = (!Array.isArray(tp) && tp.unassigned)
+      ? tp.unassigned
+      : { member_count: 0, members_submitted: 0, members_evaluated: 0, members: [] };
+    populateTeamFilter();
+    renderTeamsCharts();
+    renderTeamsPerf();
+    render();
+  } catch (e) { _drFallbackArmed = false; toastError(e); }
+}
+
+function scoreColorFromScore(score) {
+  if (score >= 75) return "success";
+  if (score >= 55) return "warn";
+  return "danger";
+}
+
+function ratingFromScore(score) {
+  if (score >= 90) return "Excellent";
+  if (score >= 75) return "V.Good";
+  if (score >= 55) return "Good";
+  if (score >= 40) return "Medium";
+  if (score >= 25) return "Weak";
+  return "Bad";
+}
+
+function renderTeamsCharts() {
+  if (typeof Plotly === 'undefined') return;
+  if (!teamsPerf.length) {
+    ["chartTeamsRanking","chartTeamsComposition"].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (Charts.cancelPending) Charts.cancelPending(id);
+      el.innerHTML = `<div class="empty-state" style="padding:40px">${t("tl_eval.no_teams_data")}</div>`;
+    });
+    return;
+  }
+
+  // Ranking horizontal bar
+  const sorted = [...teamsPerf].sort((a,b) => (b.avg_member_score||0) - (a.avg_member_score||0));
+  Charts.drawHorizontalBar("chartTeamsRanking", {
+    x: sorted.map(p => p.avg_member_score || 0).reverse(),
+    y: sorted.map(p => p.team_name).reverse(),
+    colors: sorted.map(p => Charts.scoreColorHex(p.avg_member_score || 0)).reverse(),
+    labels: sorted.map(p => (p.avg_member_score||0).toFixed(1) + "%").reverse(),
+  });
+
+  // Composition donut: total members per team
+  Charts.drawDonut("chartTeamsComposition", {
+    labels: teamsPerf.map(p => p.team_name),
+    values: teamsPerf.map(p => p.member_count || 0),
+    colors: teamsPerf.map((_, i) => Charts.PALETTE[i % Charts.PALETTE.length]),
+  }, { centerText: teamsPerf.reduce((a,p) => a + (p.member_count||0), 0) + "" });
+}
+
+function renderTeamsPerf() {
+  const host = document.getElementById("teamsPerfGrid");
+  if (!host) return;
+  if (!teamsPerf.length) {
+    host.innerHTML = `<div class="pf-empty">${t("tl_eval.no_teams_data")}</div>`;
+    return;
+  }
+  const maxScore = Math.max(1, ...teamsPerf.map(p => p.avg_member_score || 0));
+
+  host.innerHTML = teamsPerf.map(p => {
+    const score = Number(p.avg_member_score || 0);
+    const col = scoreColorFromScore(score);
+    const widthPct = Math.min(100, (score / maxScore) * 100);
+    const submittedPct = p.member_count
+      ? Math.round((p.members_evaluated / p.member_count) * 100)
+      : 0;
+    const ldScore = p.leader_score != null
+      ? `<span class="text-${scoreColorFromScore(p.leader_score)}">${Number(p.leader_score).toFixed(1)}%</span>`
+      : `<span class="text-muted">${t("tl_eval.pending")}</span>`;
+    const top = p.top_performer
+      ? `${escapeHTML(p.top_performer.name)} <span class="text-muted">(${p.top_performer.score}%)</span>`
+      : `<span class="text-muted">—</span>`;
+    const teamRating = localRating(score);
+    return `<div class="surface-card team-perf-card">
+      <div class="pf-card-head">
+        <div>
+          <div class="pf-card-title">
+            <span class="rank ${p.rank===1?'r1':p.rank===2?'r2':p.rank===3?'r3':''}" style="margin-inline-end:6px">${p.rank}</span>
+            ${escapeHTML(p.team_name)}
+          </div>
+          <div class="pf-card-sub">${t("tl_eval.tl")}: ${escapeHTML(p.leader_name || '—')} · ${ldScore}</div>
+        </div>
+        <span class="badge ${ratingClass(teamRating)}">${score.toFixed(1)}%</span>
+      </div>
+
+      <div>
+        <div class="text-muted" style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;font-weight:700;margin-bottom:6px">
+          ${t("tl_eval.team_avg")}
+        </div>
+        <div class="bar"><div class="bar-fill ${col}" style="width:${widthPct}%"></div></div>
+      </div>
+
+      <div class="pf-card-meta">
+        <span class="pf-pill"><span class="material-symbols-outlined pf-pill-icon" aria-hidden="true">groups</span>${p.member_count} ${t("tl_eval.members")}</span>
+        <span class="pf-pill ${submittedPct >= 80 ? 'brand' : ''}"><span class="material-symbols-outlined pf-pill-icon" aria-hidden="true">check_circle</span>${p.members_evaluated}/${p.member_count} ${t("tl_eval.evaluated_short")}</span>
+        ${p.total_leads ? `<span class="pf-pill"><span class="material-symbols-outlined pf-pill-icon" aria-hidden="true">inbox</span>${fmtNum(p.total_leads)} ${t("kpi.fresh_leads")}</span>` : ''}
+        ${p.total_deals ? `<span class="pf-pill accent"><span class="material-symbols-outlined pf-pill-icon" aria-hidden="true">business_center</span>${p.total_deals} ${t("kpi.deals")}</span>` : ''}
+        ${p.total_calls ? `<span class="pf-pill"><span class="material-symbols-outlined pf-pill-icon" aria-hidden="true">call</span>${fmtNum(p.total_calls)} ${t("kpi.calls")}</span>` : ''}
+      </div>
+
+      <div class="team-perf-top">
+        <span class="material-symbols-outlined" aria-hidden="true">emoji_events</span>
+        <span>${t("tl_eval.top_performer")}: ${top}</span>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function populateTeamFilter() {
+  const sel = document.getElementById("teamFilter");
+  if (!sel) return;
+  const prev = sel.value;
+  const opts = [
+    `<option value="">${t("common.all")}</option>`,
+    `<option value="none">${t("filters.no_team")}</option>`,
+  ];
+  teams.forEach(team => {
+    opts.push(`<option value="${team.id}">${escapeHTML(team.name)}</option>`);
+  });
+  sel.innerHTML = opts.join("");
+  if (prev) sel.value = prev;
+}
+
+function resetFilters() {
+  document.getElementById("teamFilter").value = "";
+  document.getElementById("statusFilter").value = "";
+  document.getElementById("searchBox").value = "";
+  render();
+  _scrollListIntoView();
+}
+
+// Debounced filter trigger — repaints the list and (if the user is searching
+// or filtering) brings the result list into view so they don't have to scroll
+// past the headline charts to see who matched. Skips the scroll on the very
+// first input (typing into an empty field) so the cursor doesn't jump on the
+// first keypress; from the second character onwards we anchor the list.
+let _filterDebounce = null;
+let _lastSearchLen = 0;
+function onSearchInput() {
+  if (_filterDebounce) clearTimeout(_filterDebounce);
+  _filterDebounce = setTimeout(() => {
+    render();
+    const search = (document.getElementById("searchBox").value || "").trim();
+    const teamVal = document.getElementById("teamFilter").value;
+    const statusVal = document.getElementById("statusFilter").value;
+    const isFiltering = !!(search || teamVal || statusVal);
+    // Only nudge scroll once the user has narrowed the list — avoids jumping
+    // when they're just opening a dropdown they'll close again.
+    if (isFiltering && (search.length !== _lastSearchLen || !search)) {
+      _scrollListIntoView();
+    }
+    _lastSearchLen = search.length;
+  }, 90);
+}
+
+function _scrollListIntoView() {
+  const list = document.getElementById("list");
+  if (!list) return;
+  // Use scrollIntoView with `block: 'start'` so the first matched card sits
+  // right under the sticky filter bar. Position-sticky controls keep the
+  // search box visible while the list is anchored at the top.
+  try {
+    list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (_) {
+    list.scrollIntoView();
+  }
+}
+
+function clearChip(id, val) {
+  const el = document.getElementById(id);
+  if (el) { el.value = val; render(); }
+}
+
+function renderChips() {
+  const teamVal = document.getElementById("teamFilter").value;
+  const statusVal = document.getElementById("statusFilter").value;
+  const search = document.getElementById("searchBox").value.trim();
+  const chips = [];
+  if (teamVal) {
+    let label = t("filters.no_team");
+    if (teamVal !== "none") {
+      const tm = teams.find(x => String(x.id) === teamVal);
+      label = tm ? tm.name : teamVal;
+    }
+    chips.push(`<span class="pf-chip">${t("filters.team")}: ${escapeHTML(label)}<button onclick="clearChip('teamFilter','')">✕</button></span>`);
+  }
+  if (statusVal) {
+    const lbl = statusVal === "done" ? t("tl_eval.evaluated") : t("tl_eval.pending");
+    chips.push(`<span class="pf-chip">${t("common.filter")}: ${escapeHTML(lbl)}<button onclick="clearChip('statusFilter','')">✕</button></span>`);
+  }
+  if (search) {
+    chips.push(`<span class="pf-chip">${t("common.search")}: ${escapeHTML(search)}<button onclick="clearChip('searchBox','')">✕</button></span>`);
+  }
+  document.getElementById("chipsRow").innerHTML = chips.join("");
+}
+
+function escapeHTML(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
+    {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]
+  ));
+}
+
+// Editing a TL evaluation is single-month (kpi_entries.month is YYYY-MM).
+// When the picker covers multiple months, the modal opens for the latest
+// month in range — newest evaluation wins.
+function _editingMonth() {
+  const r = _drCtrl ? _drCtrl.getRange() : null;
+  if (r && r.monthStr) return r.monthStr;
+  return r ? r.to.slice(0, 7) : currentMonth();
+}
+
+function render() {
+  const month = _editingMonth();
+  const teamVal = document.getElementById("teamFilter").value;
+  const statusVal = document.getElementById("statusFilter").value;
+  const search = (document.getElementById("searchBox").value || "").trim().toLowerCase();
+
+  let rows = leaders.slice();
+  if (teamVal === "none") rows = rows.filter(l => l.team_id == null);
+  else if (teamVal) rows = rows.filter(l => String(l.team_id || "") === teamVal);
+  if (statusVal === "done") rows = rows.filter(l => l.dataentry_submitted_at);
+  else if (statusVal === "pending") rows = rows.filter(l => !l.dataentry_submitted_at);
+  if (search) rows = rows.filter(l =>
+    (l.full_name || "").toLowerCase().includes(search) ||
+    (l.username || "").toLowerCase().includes(search) ||
+    (l.team_name || "").toLowerCase().includes(search));
+
+  const evaluated = leaders.filter(l => l.dataentry_submitted_at).length;
+  document.getElementById("progress").textContent =
+    `${t("tl_eval.progress")} ${evaluated} ${t("common.of")} ${leaders.length}  ·  ${t("filters.shown")} ${rows.length}`;
+
+  renderChips();
+
+  // Unassigned card: only when there are unassigned reps and the user isn't
+  // explicitly filtering to a specific team. Stays out of the way otherwise.
+  const showUnassigned = unassignedSummary.member_count > 0
+    && (!teamVal || teamVal === "none");
+  const unassignedHTML = showUnassigned ? renderUnassignedCard() : "";
+
+  const tlListHTML = rows.length === 0
+    ? `<div class="empty-state"><div class="empty-state-icon"><span class="material-symbols-outlined" aria-hidden="true">person_off</span></div><div>${t("tl_eval.no_tl")}</div></div>`
+    : rows.map(l => {
+        const done = !!l.dataentry_submitted_at;
+        const teamName = l.team_name || t("tl_eval.no_team");
+        const statusCls = done ? "badge-excellent" : "badge-pending";
+        const statusTxt = done ? t("tl_eval.evaluated") : t("tl_eval.pending");
+        const btnTxt = done ? t("tl_eval.edit") : t("tl_eval.evaluate");
+        const teamPerf = teamsPerf.find(p => p.team_id === l.team_id);
+        const teamScore = teamPerf ? teamPerf.avg_member_score : null;
+        const teamScoreBadge = teamScore != null
+          ? `<span class="badge ${ratingClass(localRating(teamScore))}" title="${t('tl_eval.team_avg')}">${t('tl_eval.team_avg')}: ${teamScore.toFixed(1)}%</span>`
+          : "";
+        // Members for this TL's team (TL-04: hierarchy view).
+        const memberCount = teamPerf ? (teamPerf.member_count || 0) : 0;
+        const membersHTML = teamPerf && Array.isArray(teamPerf.members) && teamPerf.members.length
+          ? teamPerf.members.map(memberRowHTML).join("")
+          : `<div class="text-muted" style="padding:8px 4px;font-size:13px">${t("tl_eval.no_members")}</div>`;
+        return `
+          <div class="card tl-eval-card" style="margin-bottom:14px">
+            <div class="tl-eval-card-head">
+              <div class="avatar">${escapeHTML((l.full_name||"?")[0])}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:700;font-size:15px">${escapeHTML(l.full_name)}</div>
+                <div style="font-size:12px;color:var(--text-muted)">${escapeHTML(teamName)}</div>
+              </div>
+              ${teamScoreBadge}
+              <span class="badge ${statusCls}">${statusTxt}</span>
+              <button class="btn btn-sm btn-primary" onclick="openEval(${l.id}, '${escapeHTML(l.full_name)}', '${month}')">
+                ${btnTxt}
+              </button>
+            </div>
+            ${memberCount > 0 ? `
+            <details class="tl-eval-members">
+              <summary>
+                <span class="material-symbols-outlined" aria-hidden="true">groups</span>
+                <span class="tl-eval-members-label" data-collapsed="${escapeHTML(t('tl_eval.expand_team'))}" data-expanded="${escapeHTML(t('tl_eval.collapse_team'))}">${t("tl_eval.expand_team")}</span>
+                <span class="text-muted" style="font-size:12px">· ${memberCount} ${t("tl_eval.members")}</span>
+                <span class="material-symbols-outlined tl-eval-members-chev" aria-hidden="true">expand_more</span>
+              </summary>
+              <div class="tl-members-list" style="margin-top:10px">${membersHTML}</div>
+            </details>` : ""}
+          </div>`;
+      }).join("");
+
+  document.getElementById("list").innerHTML = unassignedHTML + tlListHTML;
+}
+
+function memberRowHTML(m) {
+  const score = (m.total_score == null) ? null : Number(m.total_score);
+  const rating = m.rating || (score != null ? localRating(score) : null);
+  const ratingBadge = rating
+    ? `<span class="badge ${ratingClass(rating)}">${t("rating." + rating)}</span>`
+    : "";
+  const scoreCell = score != null
+    ? `<span class="tl-member-score">${score.toFixed(1)}%</span>`
+    : `<span class="tl-member-score is-empty">${t("tl.member_no_score")}</span>`;
+  const statusBadge = (() => {
+    const map = {
+      evaluated: { cls: "badge-excellent", key: "tl.member_status_evaluated" },
+      submitted: { cls: "badge-pending",   key: "tl.member_status_submitted" },
+      pending:   { cls: "badge-pending",   key: "tl.member_status_pending" },
+    };
+    const x = map[m.status] || map.pending;
+    return `<span class="badge ${x.cls}">${t(x.key)}</span>`;
+  })();
+  const initial = escapeHTML((m.full_name || "?").trim().charAt(0));
+  const avatarMarkup = m.avatar_url
+    ? `<div class="avatar avatar-sm avatar-img"><img src="${escapeHTML(m.avatar_url)}" alt=""></div>`
+    : `<div class="avatar avatar-sm">${initial}</div>`;
+  return `
+    <div class="tl-member-row" data-status="${escapeHTML(m.status || "")}">
+      ${avatarMarkup}
+      <div class="tl-member-name">
+        <div class="tl-member-name-line">${escapeHTML(m.full_name || "—")}</div>
+      </div>
+      ${statusBadge}
+      ${ratingBadge}
+      ${scoreCell}
+    </div>`;
+}
+
+function renderUnassignedCard() {
+  const u = unassignedSummary;
+  const memberHTML = u.members.length
+    ? u.members.map(memberRowHTML).join("")
+    : `<div class="text-muted" style="padding:8px 4px;font-size:13px">${t("tl_eval.no_members")}</div>`;
+  return `
+    <div class="card tl-eval-unassigned-card" style="margin-bottom:18px">
+      <div class="tl-eval-unassigned-head">
+        <div class="tl-eval-unassigned-icon">
+          <span class="material-symbols-outlined" aria-hidden="true">person_off</span>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="tl-eval-unassigned-title">${t("tl_eval.unassigned_title")}</div>
+          <div class="tl-eval-unassigned-hint">${t("tl_eval.unassigned_hint")}</div>
+        </div>
+        <span class="badge badge-pending">${t("tl_eval.unassigned_count").replace("{n}", u.member_count)}</span>
+        <a href="/teams" class="btn btn-sm">
+          <span class="material-symbols-outlined" aria-hidden="true">groups</span>
+          <span>${t("tl_eval.unassigned_assign")}</span>
+        </a>
+      </div>
+      <div class="tl-members-list" style="margin-top:14px">${memberHTML}</div>
+    </div>`;
+}
+
+async function openEval(tlId, tlName, month) {
+  currentTL = { id: tlId, name: tlName, month };
+  document.getElementById("modalTitle").textContent = tlName;
+  document.getElementById("modalBody").innerHTML =
+    `<div class="text-muted">${t("common.loading")}</div>`;
+  openModal("evalModal");
+
+  try {
+    tlKpiData = await api(`/api/kpi/tl-kpi/${tlId}/${month}`).catch(() => null);
+    const entry = tlKpiData ? tlKpiData.tl_entry : {};
+    const autoSection = tlKpiData ? renderAutoSection(tlKpiData) : "";
+    renderForm(entry, autoSection);
+
+    // Draw radar chart in modal once rendered
+    if (tlKpiData && tlKpiData.breakdown) {
+      setTimeout(() => {
+        const labels = Object.keys(tlKpiData.breakdown).map(k => t("kpi." + k));
+        const values = Object.values(tlKpiData.breakdown).map(v => v.achievement_pct);
+        const radarEl = document.getElementById("tlRadar");
+        if (radarEl && typeof Plotly !== 'undefined') {
+          Charts.drawRadarChart("tlRadar", { labels, values });
+        }
+      }, 80);
+    }
+  } catch (e) {
+    renderForm({}, "");
+  }
+}
+
+function renderAutoSection(data) {
+  if (!data || !data.breakdown) return "";
+  const autoKeys = ["calls", "meetings", "deals", "reservations", "followup_pct"];
+  const rows = autoKeys.map(key => {
+    const b = data.breakdown[key];
+    if (!b) return "";
+    const col = Charts.scoreColorHex(b.achievement_pct);
+    return `<div class="kpi-row" style="grid-template-columns:1fr 2fr 1fr">
+      <div class="kpi-label">${t("kpi." + key)}</div>
+      <div class="kpi-bar-wrap"><div class="kpi-bar" style="width:${Math.min(b.achievement_pct,100)}%;background:${col}"></div></div>
+      <div class="kpi-nums">
+        <span class="actual">${b.actual}</span><span class="sep">/</span>
+        <span class="target">${b.target}</span>
+        <span class="pct">${b.achievement_pct}%</span>
+      </div>
+    </div>`;
+  }).join("");
+
+  const ratingTxt = data.rating ? t("rating." + data.rating) : "—";
+  const score = (data.total_score || 0).toFixed(1);
+  return `
+    <div class="bento" style="margin-bottom:16px">
+      <div class="span-7">
+        <div class="form-section" style="margin:0">
+          <div class="form-section-title">${t("tl_eval.team_auto")}</div>
+          ${rows}
+        </div>
+      </div>
+      <div class="span-5">
+        <div class="form-section" style="margin:0;height:100%">
+          <div class="form-section-title">${t("dash.metric_pillars")}</div>
+          <div id="tlRadar" class="plotly-container short" style="min-height:240px"></div>
+          <div class="text-center" style="margin-top:8px">
+            <div style="font-size:24px;font-weight:800;font-family:Inter;color:var(--brand)">${score}%</div>
+            <div class="text-muted" style="font-size:12px;font-weight:600">${ratingTxt}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderForm(entry, autoHtml) {
+  const v = (key, def="0") => entry[key] !== undefined ? entry[key] : def;
+  document.getElementById("modalBody").innerHTML = `
+    ${autoHtml}
+    <div class="form-section">
+      <div class="form-section-title">${t("tl_eval.manual_fields")}</div>
+      <div class="field-row">
+        <div class="field">
+          <label>${t("kpi.crm_own")} %</label>
+          <input type="number" min="0" max="100" id="f_crm_pct" value="${v("crm_pct")}">
+        </div>
+        <div class="field">
+          <label>${t("kpi.reports")}</label>
+          <input type="number" min="0" id="f_reports" value="${v("reports")}">
+        </div>
+      </div>
+      <div class="field">
+        <label>${t("kpi.clients_pipeline")} %</label>
+        <input type="number" min="0" max="100" id="f_clients_pipeline" value="${v("clients_pipeline")}">
+      </div>
+
+      <div class="form-section-title" style="margin-top:14px">${t("tl_eval.personal_eval")}</div>
+      <div class="field-row">
+        ${passfailField("f_attitude", t("kpi.attitude"), v("attitude"))}
+        ${passfailField("f_presentation", t("kpi.presentation"), v("presentation"))}
+      </div>
+      <div class="field-row">
+        ${passfailField("f_behaviour", t("kpi.behaviour"), v("behaviour"))}
+        ${passfailField("f_appearance", t("kpi.appearance"), v("appearance"))}
+      </div>
+      <div class="field-row">
+        ${passfailField("f_attendance_pct", t("kpi.attendance_pct"), v("attendance_pct"))}
+        ${passfailField("f_hr_roles", t("kpi.hr_roles"), v("hr_roles"))}
+      </div>
+      <div class="field" style="margin-top:8px">
+        <label>${t("tl_eval.notes")}</label>
+        <textarea id="f_notes" rows="2" style="width:100%">${escapeHTML(entry.notes||"")}</textarea>
+      </div>
+    </div>`;
+}
+
+function passfailField(id, label, val) {
+  const isPass = Number(val) === 100;
+  return `
+    <div class="field">
+      <label>${label}</label>
+      <div class="passfail-toggle" role="radiogroup" aria-label="${escapeHTML(label)}">
+        <button type="button" role="radio" aria-checked="${isPass}" data-pf-target="${id}" data-pf-value="100" class="${isPass ? 'is-active' : ''}">${t("common.pass")}</button>
+        <button type="button" role="radio" aria-checked="${!isPass}" data-pf-target="${id}" data-pf-value="0" class="${!isPass ? 'is-active' : ''}">${t("common.fail")}</button>
+      </div>
+      <input type="hidden" id="${id}" value="${isPass ? 100 : 0}">
+    </div>`;
+}
+
+// Pass/fail toggle click delegate is registered globally in common.js (initPassfailToggles).
+
+async function saveEval() {
+  if (!currentTL) return;
+  const body = {
+    user_id:          currentTL.id,
+    month:            currentTL.month,
+    crm_pct:          parseFloat(document.getElementById("f_crm_pct").value)||0,
+    reports:          parseInt(document.getElementById("f_reports").value)||0,
+    clients_pipeline: parseFloat(document.getElementById("f_clients_pipeline").value)||0,
+    attitude:         parseInt(document.getElementById("f_attitude").value)||0,
+    presentation:     parseInt(document.getElementById("f_presentation").value)||0,
+    behaviour:        parseInt(document.getElementById("f_behaviour").value)||0,
+    appearance:       parseInt(document.getElementById("f_appearance").value)||0,
+    attendance_pct:   parseFloat(document.getElementById("f_attendance_pct").value)||0,
+    hr_roles:         parseInt(document.getElementById("f_hr_roles").value)||0,
+    notes:            document.getElementById("f_notes").value||"",
+  };
+  try {
+    await api("/api/kpi/submit/tl-evaluation", { method:"POST", body });
+    toast(t("common.saved"), "success");
+    closeModal("evalModal");
+    loadAll();
+  } catch (e) { toastError(e); }
+}
+
+function onLangChange() {
+  if (_drCtrl) {
+    _drCtrl.refreshLabels();
+    _updateRangeWarning(_drCtrl.getRange());
+  }
+  render();
+  // Charts on this page pre-resolve hex colours at the call site
+  // (Charts.scoreColorHex / Charts.PALETTE[i]), so the closure replay
+  // alone keeps the old palette. Re-run the chart renderers with the
+  // freshly-mutated palette.
+  renderTeamsCharts();
+  renderTeamsPerf();
+}
+
+// Explicit theme hook — fired by charts.js right after the palette is
+// rebuilt. Same body as onLangChange but without the locale label refresh
+// (pointless on a theme flip) so the round-trip is just the chart redraw.
+function onThemeChange() {
+  render();
+  renderTeamsCharts();
+  renderTeamsPerf();
+}
+
+// Reactive contextual warning — shown when sub-month preset is selected.
+function _updateRangeWarning(range) {
+  const host = document.getElementById("rangeWarning");
+  const txt = document.getElementById("rangeWarningText");
+  if (!host || !txt) return;
+  if (range && range.isSubMonth) {
+    txt.innerHTML = t("tl_eval.range_warning_submonth");
+    host.hidden = false;
+  } else {
+    host.hidden = true;
+  }
+}
+
+// All presets allowed; the warning banner above the per-TL list flags
+// sub-month selections so users don't misread monthly evaluations as daily.
+_drCtrl = DateRange.mount(document.getElementById("dateRangeHost"), {
+  defaultPreset: "last_30",
+  mode: "full",
+  onChange: (range) => { _updateRangeWarning(range); loadAll(); },
+});
+</script>
+{% endblock %}

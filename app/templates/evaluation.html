@@ -1,0 +1,1285 @@
+{% extends "base.html" %}
+{% block title %}Ain KPI{% endblock %}
+
+{% block head %}
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title" data-i18n="eval.title"></h1>
+    <p class="page-subtitle" data-i18n="eval.subtitle"></p>
+  </div>
+  <button class="btn btn-primary" id="btnNewEval" onclick="seOpenNewEvalModal()">
+    <span class="material-symbols-outlined" aria-hidden="true">add</span>
+    <span data-i18n="de.new_evaluation"></span>
+  </button>
+</div>
+
+<div class="eval-tabs">
+  <button class="eval-tab is-active" id="tab-btn-sales" onclick="switchTab('sales')" data-i18n="eval.tab_sales"></button>
+  {% if user.role in ['manager', 'admin'] %}
+  <button class="eval-tab" id="tab-btn-tl" onclick="switchTab('tl')" data-i18n="eval.tab_tl"></button>
+  {% endif %}
+</div>
+
+<!-- ═══════════════════════════════════ TAB: SALES EVALUATION ═══════════════════════════════════ -->
+<div id="tab-sales">
+
+  <div class="bento" id="deTiles">
+    <div class="kpi-tile tile-brand span-3">
+      <div class="kpi-tile-head">
+        <div class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">groups</span></div>
+        <div class="kpi-tile-label" data-i18n="de.team_size"></div>
+      </div>
+      <div class="kpi-tile-value" id="seTileTotal">—</div>
+    </div>
+    <div class="kpi-tile tile-accent span-3">
+      <div class="kpi-tile-head">
+        <div class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">check_circle</span></div>
+        <div class="kpi-tile-label" data-i18n="de.evaluated"></div>
+      </div>
+      <div class="kpi-tile-value" id="seTileDone">—</div>
+      <div class="kpi-tile-sub" id="seTileDoneSub">&nbsp;</div>
+    </div>
+    <div class="kpi-tile tile-warm span-3 is-clickable" id="seTilePending" tabindex="0" role="button" data-i18n-aria-label="dash.tile_action_pending_eval">
+      <div class="kpi-tile-head">
+        <div class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">hourglass_empty</span></div>
+        <div class="kpi-tile-label" data-i18n="de.waiting_eval"></div>
+      </div>
+      <div class="kpi-tile-value" id="seTilePendingVal">—</div>
+    </div>
+    <div class="kpi-tile tile-coral span-3">
+      <div class="kpi-tile-head">
+        <div class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">inbox</span></div>
+        <div class="kpi-tile-label" data-i18n="de.missing_sales"></div>
+      </div>
+      <div class="kpi-tile-value" id="seTileMissing">—</div>
+    </div>
+  </div>
+
+  <div class="bento">
+    <div class="chart-card span-4">
+      <h3 data-i18n="dash.chart_status_split"></h3>
+      <div id="seChartProgress" class="plotly-container short"></div>
+    </div>
+    <div class="chart-card span-8">
+      <h3 data-i18n="dash.chart_leaderboard"></h3>
+      <div id="seChartScores" class="plotly-container short"></div>
+    </div>
+  </div>
+
+  <div class="controls controls-sticky">
+    <div class="field">
+      <label data-i18n="common.month"></label>
+      <div id="seDateRangeHost"></div>
+    </div>
+    <div class="field">
+      <label data-i18n="common.filter"></label>
+      <select id="seFilterStatus" onchange="seApplyFilters()">
+        <option value="all" data-i18n="de.all_team"></option>
+        <option value="pending" data-i18n="de.waiting_eval"></option>
+        <option value="done" data-i18n="de.evaluated"></option>
+        <option value="no-sales" data-i18n="de.missing_sales"></option>
+        <option value="mine" data-i18n="de.my_submissions"></option>
+      </select>
+    </div>
+    <div class="field">
+      <label data-i18n="filters.team"></label>
+      <select id="seTeamFilter" onchange="seApplyFilters()">
+        <option value="" data-i18n="common.all"></option>
+        <option value="none" data-i18n="filters.no_team"></option>
+      </select>
+    </div>
+    <div class="field" style="flex:1;min-width:180px">
+      <label for="seSearchBox" data-i18n="common.search"></label>
+      <div class="pf-search-input-wrap">
+        <span class="material-symbols-outlined pf-search-icon" aria-hidden="true">search</span>
+        <input type="text" id="seSearchBox" oninput="seOnSearchInput()" data-i18n-placeholder="filters.search_user_ph">
+        <button type="button" class="pf-search-clear" id="seSearchClear" onclick="seClearSearchBox()" data-i18n-aria-label="common.clear" hidden>
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        </button>
+      </div>
+    </div>
+    <div class="field" style="align-self:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="seResetFilters()" data-i18n="filters.reset"></button>
+    </div>
+    <div class="spacer"></div>
+    <div id="seProgress" class="text-muted" style="font-size:13px;font-weight:600"></div>
+  </div>
+
+  <div id="seChipsRow" class="pf-chips" style="margin-bottom:12px"></div>
+  <div id="seList"></div>
+</div>
+
+<!-- ═══════════════════════════════════ TAB: TL EVALUATION ═══════════════════════════════════ -->
+{% if user.role in ['manager', 'admin'] %}
+<div id="tab-tl" hidden>
+
+  <div class="controls controls-sticky">
+    <div class="field">
+      <label data-i18n="common.month"></label>
+      <div id="tlDateRangeHost"></div>
+    </div>
+    <div class="field">
+      <label data-i18n="filters.team"></label>
+      <select id="tlTeamFilter" onchange="tlOnSearchInput()">
+        <option value="" data-i18n="common.all"></option>
+        <option value="none" data-i18n="filters.no_team"></option>
+      </select>
+    </div>
+    <div class="field">
+      <label data-i18n="common.filter"></label>
+      <select id="tlStatusFilter" onchange="tlOnSearchInput()">
+        <option value="" data-i18n="common.all"></option>
+        <option value="done" data-i18n="tl_eval.evaluated"></option>
+        <option value="pending" data-i18n="tl_eval.pending"></option>
+      </select>
+    </div>
+    <div class="field" style="flex:1;min-width:180px">
+      <label data-i18n="common.search"></label>
+      <input type="text" id="tlSearchBox" oninput="tlOnSearchInput()" data-i18n-placeholder="filters.search_user_ph" autocomplete="off">
+    </div>
+    <div class="field" style="align-self:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="tlResetFilters()" data-i18n="filters.reset"></button>
+    </div>
+    <div class="spacer"></div>
+    <div id="tlProgress" class="text-muted" style="font-size:13px;font-weight:600"></div>
+  </div>
+
+  <div class="dr-context-warning-host" id="tlRangeWarningHost" aria-live="polite">
+    <div class="dr-context-warning" id="tlRangeWarning" hidden>
+      <span class="material-symbols-outlined" aria-hidden="true">warning</span>
+      <div class="dr-context-warning-text" id="tlRangeWarningText"></div>
+    </div>
+  </div>
+
+  <div id="tlChipsRow" class="pf-chips" style="margin-bottom:12px"></div>
+
+  <div class="bento">
+    <div class="chart-card span-8">
+      <h3 data-i18n="tl_eval.teams_perf"></h3>
+      <div id="tlChartRanking" class="plotly-container"></div>
+    </div>
+    <div class="chart-card span-4">
+      <h3 data-i18n="tl_eval.teams_perf_hint"></h3>
+      <div id="tlChartComposition" class="plotly-container"></div>
+    </div>
+  </div>
+
+  <div class="card reveal" id="tlTeamsPerfCard">
+    <div class="card-title">
+      <span data-i18n="tl_eval.teams_perf"></span>
+      <span class="text-muted" style="font-size:11px;margin-inline-start:8px" data-i18n="tl_eval.teams_perf_hint"></span>
+    </div>
+    <div id="tlTeamsPerfGrid" class="pf-grid">
+      <div class="pf-empty"><span class="loading"></span></div>
+    </div>
+  </div>
+
+  <div class="card-title mb-2" style="margin-top:12px">
+    <span data-i18n="tl_eval.title"></span>
+  </div>
+  <div id="tlList" class="stagger"></div>
+</div>
+{% endif %}
+
+<!-- ═══════════════════════════════════ MODAL: New Sales Eval ═══════════════════════════════════ -->
+<div class="modal-backdrop" id="newEvalModal" role="dialog" aria-modal="true" aria-labelledby="newEvalTitle">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title" id="newEvalTitle" data-i18n="de.new_evaluation"></div>
+      <button class="modal-close" onclick="closeModal('newEvalModal')" data-i18n-aria-label="common.close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-muted" style="font-size:13px;margin-top:0" data-i18n="de.new_evaluation_hint"></p>
+      <div class="field">
+        <label for="neRep" data-i18n="de.pick_rep"></label>
+        <select id="neRep">
+          <option value="" data-i18n="de.pick_rep_placeholder"></option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="neMonth" data-i18n="common.month"></label>
+        <input type="month" id="neMonth">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="seStartNewEvaluation()" data-i18n="de.start_evaluation"></button>
+      <button class="btn btn-ghost" onclick="closeModal('newEvalModal')" data-i18n="common.cancel"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ MODAL: TL Evaluation ═══════════════════════════════════ -->
+{% if user.role in ['manager', 'admin'] %}
+<div class="modal-backdrop" id="tlEvalModal" role="dialog" aria-modal="true" aria-labelledby="tlModalTitle">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <div class="modal-title" id="tlModalTitle"></div>
+      <button class="modal-close" onclick="closeModal('tlEvalModal')" data-i18n-aria-label="common.close">✕</button>
+    </div>
+    <div class="modal-body" id="tlModalBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="tlSaveEval()" data-i18n="tl_eval.save"></button>
+      <button class="btn btn-ghost" onclick="closeModal('tlEvalModal')" data-i18n="common.cancel"></button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}?v=flat61"></script>
+<script src="{{ url_for('static', filename='js/date_range.js') }}?v=flat61"></script>
+<script>
+const CURRENT_USER_ID = {{ user.id|tojson }};
+const CURRENT_USER_ROLE = {{ user.role|tojson }};
+
+function escapeHTML(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c =>
+    ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
+
+// ── Tab switching ──────────────────────────────────────────────────────────────
+let _activeTab = 'sales';
+let _tlTabInited = false;
+
+function switchTab(tab) {
+  _activeTab = tab;
+  const salesDiv = document.getElementById('tab-sales');
+  const tlDiv    = document.getElementById('tab-tl');
+  if (salesDiv) salesDiv.hidden = (tab !== 'sales');
+  if (tlDiv)    tlDiv.hidden    = (tab !== 'tl');
+
+  document.querySelectorAll('.eval-tab').forEach(b => b.classList.remove('is-active'));
+  const activeBtn = document.getElementById('tab-btn-' + tab);
+  if (activeBtn) activeBtn.classList.add('is-active');
+
+  const btnNew = document.getElementById('btnNewEval');
+  if (btnNew) btnNew.hidden = (tab !== 'sales');
+
+  if (tab === 'tl' && !_tlTabInited && tlDrCtrl) {
+    _tlTabInited = true;
+    tlLoadAll();
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SALES EVALUATION
+// ══════════════════════════════════════════════════════════════════════════════
+let seUsers = [], seEntries = {}, seTeams = [], seKpiConfig = null;
+let seDrCtrl = null, seDrFallbackArmed = true;
+
+const NUMERIC   = ["fresh_leads","calls","meetings","crm_pct","deals","reports","reservations","followup_pct","attendance_pct"];
+const PASSFAIL  = ["attitude","presentation","behaviour","appearance","hr_roles"];
+const PCT_FIELDS = new Set(["crm_pct","followup_pct","attendance_pct"]);
+const SOFT_MAX  = {calls:10000,meetings:500,deals:100,reports:50,reservations:200,fresh_leads:5000};
+
+async function seLoadAll() {
+  if (!seDrCtrl) return;
+  try {
+    const qs = seDrCtrl.toQueryString();
+    const [u, report, ts, cfg] = await Promise.all([
+      api("/api/users?role=sales&active_only=true"),
+      api(`/api/kpi/report?${qs}`),
+      seTeams.length ? Promise.resolve(seTeams) : api("/api/teams").catch(() => []),
+      seKpiConfig ? Promise.resolve(seKpiConfig) : api("/api/kpi/config").catch(() => null),
+    ]);
+    if (seDrFallbackArmed && Array.isArray(report) && report.length === 0
+        && seDrCtrl.getRange().preset !== "ytd") {
+      seDrFallbackArmed = false;
+      seDrCtrl.setRange({ preset: "ytd" });
+      return;
+    }
+    seDrFallbackArmed = false;
+    seUsers = u;
+    seTeams = ts || [];
+    seKpiConfig = cfg || seKpiConfig;
+    sePopulateTeamFilter();
+    seEntries = {};
+    report.forEach(r => { seEntries[r.user_id] = r; });
+    seRenderAll();
+  } catch (e) { seDrFallbackArmed = false; toastError(e); }
+}
+
+function sePopulateTeamFilter() {
+  const sel = document.getElementById("seTeamFilter");
+  if (!sel) return;
+  const prev = sel.value;
+  const opts = [
+    `<option value="">${t("common.all")}</option>`,
+    `<option value="none">${t("filters.no_team")}</option>`,
+  ];
+  seTeams.forEach(team => opts.push(`<option value="${team.id}">${escapeHTML(team.name)}</option>`));
+  sel.innerHTML = opts.join("");
+  if (prev) sel.value = prev;
+}
+
+function seResetFilters() {
+  document.getElementById("seFilterStatus").value = "all";
+  document.getElementById("seTeamFilter").value = "";
+  document.getElementById("seSearchBox").value = "";
+  seApplyFilters();
+}
+
+function seRenderChips() {
+  const status  = document.getElementById("seFilterStatus").value;
+  const teamVal = document.getElementById("seTeamFilter").value;
+  const search  = document.getElementById("seSearchBox").value.trim();
+  const chips = [];
+  if (status && status !== "all") {
+    const lbl = {pending:t("de.waiting_eval"),done:t("de.evaluated"),"no-sales":t("de.missing_sales")}[status] || status;
+    chips.push(`<span class="pf-chip">${t("common.filter")}: ${escapeHTML(lbl)}<button onclick="seClearChip('seFilterStatus','all')">✕</button></span>`);
+  }
+  if (teamVal) {
+    let label = t("filters.no_team");
+    if (teamVal !== "none") { const tm = seTeams.find(x => String(x.id) === teamVal); label = tm ? tm.name : teamVal; }
+    chips.push(`<span class="pf-chip">${t("filters.team")}: ${escapeHTML(label)}<button onclick="seClearChip('seTeamFilter','')">✕</button></span>`);
+  }
+  if (search) chips.push(`<span class="pf-chip">${t("common.search")}: ${escapeHTML(search)}<button onclick="seClearChip('seSearchBox','')">✕</button></span>`);
+  document.getElementById("seChipsRow").innerHTML = chips.join("");
+}
+
+function seClearChip(id, val) {
+  const el = document.getElementById(id);
+  if (el) { el.value = val; seApplyFilters(); }
+}
+
+function seOnSearchInput() {
+  const sb  = document.getElementById("seSearchBox");
+  const clr = document.getElementById("seSearchClear");
+  if (clr) clr.hidden = !(sb && sb.value.length);
+  seApplyFilters();
+}
+
+function seClearSearchBox() {
+  const sb = document.getElementById("seSearchBox");
+  if (sb) { sb.value = ""; sb.focus(); }
+  seOnSearchInput();
+}
+
+function seOpenNewEvalModal() {
+  const sel = document.getElementById("neRep");
+  const opts = [`<option value="">${t("de.pick_rep_placeholder")}</option>`];
+  [...seUsers].sort((a, b) => (a.full_name||"").localeCompare(b.full_name||""))
+    .forEach(u => opts.push(`<option value="${u.id}">${escapeHTML(u.full_name)}</option>`));
+  sel.innerHTML = opts.join("");
+  const r = seDrCtrl ? seDrCtrl.getRange() : null;
+  document.getElementById("neMonth").value = (r && r.monthStr) || (r ? r.to.slice(0,7) : currentMonth());
+  openModal("newEvalModal");
+  setTimeout(() => sel.focus(), 50);
+}
+
+function seStartNewEvaluation() {
+  const repId = document.getElementById("neRep").value;
+  const month = document.getElementById("neMonth").value;
+  if (!repId) { toast(t("de.pick_rep_required"), "error"); return; }
+  if (!month) { toast(t("de.pick_month_required"), "error"); return; }
+  closeModal("newEvalModal");
+  if (seDrCtrl) {
+    const r = seDrCtrl.getRange();
+    if (!r || r.monthStr !== month) {
+      const [y, m] = month.split("-").map(Number);
+      const last = new Date(y, m, 0).getDate();
+      seDrCtrl.setRange({ from:`${month}-01`, to:`${month}-${String(last).padStart(2,"0")}`, preset:"custom" });
+    }
+  }
+  _seFocusAfterReload = Number(repId);
+  const existing = document.querySelector(`.de-card[data-user-id="${repId}"]`);
+  if (existing && !existing.classList.contains("is-hidden")) {
+    seExpandCard(Number(repId));
+    existing.scrollIntoView({ behavior:"smooth", block:"start" });
+    const first = existing.querySelector("input[type='number']");
+    if (first) first.focus();
+    _seFocusAfterReload = null;
+  }
+}
+
+function seRenderTilesAndCharts() {
+  const total   = seUsers.length;
+  const done    = seUsers.filter(u => seEntries[u.id] && seEntries[u.id].dataentry_submitted_at).length;
+  const pending = seUsers.filter(u => seEntries[u.id] && seEntries[u.id].sales_submitted_at && !seEntries[u.id].dataentry_submitted_at).length;
+  const missing = seUsers.filter(u => !seEntries[u.id] || !seEntries[u.id].sales_submitted_at).length;
+
+  document.getElementById("seTileTotal").textContent     = total;
+  document.getElementById("seTileDone").textContent      = done;
+  document.getElementById("seTileDoneSub").textContent   = total ? Math.round(done/total*100) + "%" : "0%";
+  document.getElementById("seTilePendingVal").textContent = pending;
+  document.getElementById("seTileMissing").textContent   = missing;
+
+  if (typeof Plotly === 'undefined') return;
+
+  const labels = [], values = [], colors = [];
+  if (done)    { labels.push(t("de.evaluated"));     values.push(done);    colors.push(Charts.COLORS.accent2);  }
+  if (pending) { labels.push(t("de.waiting_eval"));  values.push(pending); colors.push(Charts.COLORS.warning2); }
+  if (missing) { labels.push(t("de.missing_sales")); values.push(missing); colors.push(Charts.COLORS.danger2);  }
+  if (values.length) {
+    Charts.drawDonut("seChartProgress", { labels, values, colors }, { centerText: total + "" });
+  } else {
+    if (Charts.cancelPending) Charts.cancelPending("seChartProgress");
+    document.getElementById("seChartProgress").innerHTML = `<div class="empty-state" style="padding:30px">${t("dash.no_data")}</div>`;
+  }
+
+  const scored = seUsers
+    .map(u => ({ u, e: seEntries[u.id] }))
+    .filter(x => x.e && (x.e.sales_submitted_at || x.e.dataentry_submitted_at))
+    .map(x => ({ name: x.u.full_name, score: parseFloat(x.e.total_score) || 0 }))
+    .sort((a, b) => b.score - a.score).slice(0, 10);
+
+  if (scored.length) {
+    Charts.drawHorizontalBar("seChartScores", {
+      x: scored.map(s => s.score).reverse(),
+      y: scored.map(s => s.name).reverse(),
+      colors: scored.map(s => Charts.scoreColorHex(s.score)).reverse(),
+      labels: scored.map(s => s.score.toFixed(1) + "%").reverse(),
+    });
+  } else {
+    if (Charts.cancelPending) Charts.cancelPending("seChartScores");
+    document.getElementById("seChartScores").innerHTML = `<div class="empty-state" style="padding:30px">${t("dash.no_data")}</div>`;
+  }
+}
+
+function seRenderAll() {
+  const container = document.getElementById("seList");
+  const rows = seUsers.map(u => ({ user: u, entry: seEntries[u.id] || null }));
+  if (!rows.length) {
+    container.innerHTML = `<div class="card text-center text-muted" style="padding:50px">${t("admin.no_users")}</div>`;
+  } else {
+    container.innerHTML = rows.map(({user, entry}) => seRenderCard(user, entry)).join("");
+  }
+  seRenderTilesAndCharts();
+  seApplyFilters();
+
+  if (_seFocusAfterReload != null) {
+    const next = document.querySelector(`.de-card[data-user-id="${_seFocusAfterReload}"]`);
+    if (next) {
+      seExpandCard(_seFocusAfterReload);
+      next.scrollIntoView({ behavior:"smooth", block:"start" });
+      const first = next.querySelector("input[type='number']");
+      if (first) first.focus();
+    }
+    _seFocusAfterReload = null;
+  }
+}
+
+function seApplyFilters() {
+  const filter  = document.getElementById("seFilterStatus").value;
+  const teamVal = document.getElementById("seTeamFilter").value;
+  const search  = (document.getElementById("seSearchBox").value || "").trim().toLowerCase();
+  const container = document.getElementById("seList");
+  const cards   = container.querySelectorAll(".de-card[data-user-id]");
+
+  let shown = 0;
+  cards.forEach(card => {
+    const status = card.dataset.status;
+    const team   = card.dataset.team;
+    const hay    = card.dataset.search || "";
+    const owner  = card.dataset.owner || "";
+    let visible = true;
+    if (filter === "pending"  && status !== "pending") visible = false;
+    if (filter === "done"     && status !== "done")    visible = false;
+    if (filter === "no-sales" && status !== "missing") visible = false;
+    if (filter === "mine" && (owner === "" || Number(owner) !== CURRENT_USER_ID)) visible = false;
+    if (teamVal === "none" && team !== "none") visible = false;
+    else if (teamVal && team !== teamVal)      visible = false;
+    if (search && !hay.includes(search)) visible = false;
+    card.classList.toggle("is-hidden", !visible);
+    if (visible) shown++;
+  });
+
+  let empty = container.querySelector(".de-empty");
+  if (!shown && cards.length) {
+    if (!empty) {
+      empty = document.createElement("div");
+      empty.className = "card de-empty text-center";
+      container.appendChild(empty);
+    }
+    empty.innerHTML = `<div class="text-muted" style="padding:30px 20px 16px">${t("admin.no_users")}</div>
+      <button type="button" class="btn btn-sm" onclick="seResetFilters()">
+        <span class="material-symbols-outlined" aria-hidden="true">restart_alt</span>
+        <span>${t("pf.clear_filters")}</span>
+      </button>`;
+  } else if (empty) {
+    empty.remove();
+  }
+
+  const done = seUsers.filter(u => seEntries[u.id] && seEntries[u.id].dataentry_submitted_at).length;
+  document.getElementById("seProgress").textContent =
+    `${t("de.progress")} ${done} ${t("de.of")} ${seUsers.length}  ·  ${t("filters.shown")} ${shown}`;
+  seRenderChips();
+}
+
+function seRenderCard(user, entry) {
+  const isDone     = entry && entry.dataentry_submitted_at;
+  const hasNumeric = entry && entry.sales_submitted_at;
+  const score      = entry ? parseFloat(entry.total_score) || 0 : 0;
+  const statusBadges = [dePill('sales', !!hasNumeric), dePill('eval', !!isDone)];
+  const scoreBlock = isDone
+    ? `<div class="entry-score-mini">
+        <div class="num ${(entry.rating ? ratingClass(entry.rating) : ratingClass(localRating(score))).replace('badge-','')}">${score.toFixed(1)}%</div>
+        <div class="label">${t("rating." + (entry.rating || localRating(score)))}</div>
+       </div>`
+    : "";
+  const status    = isDone ? "done" : (hasNumeric ? "pending" : "missing");
+  const teamAttr  = user.team_id == null ? "none" : String(user.team_id);
+  const searchHay = ((user.full_name || "") + " " + (user.username || "")).toLowerCase();
+  const ownerAttr = (entry && entry.dataentry_by != null) ? String(entry.dataentry_by) : "";
+
+  return `<div class="card de-card" data-user-id="${user.id}" data-status="${status}" data-team="${escapeHTML(teamAttr)}" data-search="${escapeHTML(searchHay)}" data-owner="${escapeHTML(ownerAttr)}">
+    <div class="de-card-head" role="button" tabindex="0" aria-expanded="false" aria-controls="se-body-${user.id}" onclick="seToggleCard(${user.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();seToggleCard(${user.id});}">
+      <div class="row-actor">
+        <div class="avatar">${escapeHTML((user.full_name||"?")[0])}</div>
+        <div>
+          <div class="de-card-name">${escapeHTML(user.full_name)}</div>
+          <div class="de-card-username">@${escapeHTML(user.username)}</div>
+        </div>
+      </div>
+      <div class="de-card-status">
+        ${statusBadges.join("")}
+        ${scoreBlock}
+        <span class="de-card-toggle" aria-hidden="true"><span class="material-symbols-outlined">expand_more</span></span>
+      </div>
+    </div>
+    <div class="de-card-body" id="se-body-${user.id}" data-rendered="0"></div>
+  </div>`;
+}
+
+function seRenderCardBody(userId) {
+  const user  = seUsers.find(u => u.id === userId);
+  if (!user) return "";
+  const entry = seEntries[userId] || null;
+  const v = (key, def="") => (!entry || entry[key] == null) ? def : entry[key];
+
+  const numericInputs = NUMERIC.map(k => {
+    const isPct   = PCT_FIELDS.has(k);
+    const fid     = `se-${k}-${userId}`;
+    const softMax = SOFT_MAX[k];
+    return `<div class="field">
+      <label for="${fid}">${t("kpi." + k)}${isPct ? " %" : ""}</label>
+      <input type="number" min="0" ${isPct ? 'max="100" step="0.1"' : ""}
+             id="${fid}" name="${k}" data-kpi-key="${k}" value="${escapeHTML(v(k,""))}"
+             aria-describedby="warn-soft-${fid}">
+      <small id="warn-soft-${fid}" class="field-soft-warn" hidden>
+        ${softMax ? t("de.value_seems_high").replace("{n}", softMax.toLocaleString()) : ""}
+      </small>
+    </div>`;
+  }).join("");
+
+  const passfailInputs = PASSFAIL.map(k => {
+    const current = entry ? Number(entry[k] || 0) : 0;
+    const fid     = `se-${k}-${userId}`;
+    const label   = t("kpi." + k);
+    const isPass  = current === 100;
+    return `<div class="field">
+      <span class="field-label-text">${label}</span>
+      <div class="passfail-toggle" role="radiogroup" aria-label="${escapeHTML(label)}">
+        <button type="button" role="radio" aria-checked="${isPass}" data-pf-target="${fid}" data-pf-value="100" class="${isPass?'is-active':''}">${t("common.pass")}</button>
+        <button type="button" role="radio" aria-checked="${!isPass}" data-pf-target="${fid}" data-pf-value="0" class="${!isPass?'is-active':''}">${t("common.fail")}</button>
+      </div>
+      <input type="hidden" id="${fid}" value="${isPass ? 100 : 0}">
+    </div>`;
+  }).join("");
+
+  return `<form id="se-form-${userId}" onsubmit="event.preventDefault();seSaveEval(${userId})">
+    <div class="form-section-title de-section-title">${t("sales.numeric_perf")}</div>
+    <div class="field-row four de-field-grid">${numericInputs}</div>
+    <div class="form-section-title">${t("tl_eval.personal_eval")}</div>
+    <div class="field-row five de-field-grid">${passfailInputs}</div>
+    <div class="field notes-field">
+      <label for="se-notes-${userId}">${t("de.notes")}</label>
+      <textarea id="se-notes-${userId}" rows="2" maxlength="400"
+                placeholder="${t("de.notes_ph")}"
+                data-char-counter="se-counter-${userId}">${escapeHTML(entry && entry.notes ? entry.notes : '')}</textarea>
+      <small id="se-counter-${userId}" class="char-count">${(entry && entry.notes ? entry.notes : '').length}/400</small>
+    </div>
+    <div class="de-warn" id="se-warn-${userId}" role="alert" hidden>
+      <span class="material-symbols-outlined" aria-hidden="true">info</span>
+      <span>${t("de.confirm_no_numeric")}</span>
+      <button type="submit" class="de-warn-confirm">${t("de.save_anyway")}</button>
+    </div>
+    <div class="de-card-actions">
+      <span class="de-preview" id="se-preview-${userId}" aria-live="polite"></span>
+      <button type="submit" class="btn btn-primary">${t("de.save_eval")}</button>
+      ${entry ? `<button type="button" class="btn" onclick="seShowDetail(${userId})">${t("common.details")}</button>` : ''}
+    </div>
+  </form>`;
+}
+
+function seToggleCard(userId) {
+  const card = document.querySelector(`.de-card[data-user-id="${userId}"]`);
+  if (!card) return;
+  const head = card.querySelector(".de-card-head");
+  const body = card.querySelector(".de-card-body");
+  const expand = !card.classList.contains("is-expanded");
+  card.classList.toggle("is-expanded", expand);
+  if (head) head.setAttribute("aria-expanded", expand ? "true" : "false");
+  if (expand) {
+    if (body && body.dataset.rendered !== "1") {
+      body.innerHTML = seRenderCardBody(userId);
+      body.dataset.rendered = "1";
+    }
+    seRefreshPreview(String(userId));
+  }
+}
+
+function seExpandCard(userId) {
+  const card = document.querySelector(`.de-card[data-user-id="${userId}"]`);
+  if (!card || card.classList.contains("is-expanded")) return;
+  seToggleCard(userId);
+}
+
+function dePill(kind, done) {
+  const label        = kind === 'sales' ? t("de.sales_done_short") : t("de.evaluated");
+  const pendingLabel = kind === 'sales' ? t("de.sales_not_done")   : t("de.waiting_eval");
+  const icon = done ? "check_circle" : "radio_button_unchecked";
+  const cls  = done ? "is-done" : "is-pending";
+  return `<span class="status-pill ${cls}">
+    <span class="material-symbols-outlined" aria-hidden="true">${icon}</span>${done ? label : pendingLabel}
+  </span>`;
+}
+
+const _seWarnedCards = new Set();
+
+function seEditingMonth(userId) {
+  const existing = seEntries[userId];
+  if (existing && existing.month) return existing.month;
+  const r = seDrCtrl ? seDrCtrl.getRange() : null;
+  if (r && r.monthStr) return r.monthStr;
+  return r ? r.to.slice(0,7) : currentMonth();
+}
+
+async function seSaveEval(userId) {
+  const month = seEditingMonth(userId);
+  const body  = { user_id: userId, month, notes: document.getElementById(`se-notes-${userId}`).value || "" };
+  let hasNumeric = false;
+  NUMERIC.forEach(k => {
+    const el  = document.getElementById(`se-${k}-${userId}`);
+    const raw = (el.value || "").trim();
+    if (raw === "") return;
+    const n = Number(raw);
+    if (isNaN(n) || n < 0) return;
+    body[k] = n; hasNumeric = true;
+  });
+  const warn = document.getElementById(`se-warn-${userId}`);
+  if (!hasNumeric && !_seWarnedCards.has(userId)) {
+    if (warn) warn.hidden = false;
+    _seWarnedCards.add(userId);
+    return;
+  }
+  if (warn) warn.hidden = true;
+  _seWarnedCards.delete(userId);
+  PASSFAIL.forEach(k => body[k] = document.getElementById(`se-${k}-${userId}`).value);
+  try {
+    const data = await api("/api/kpi/submit/evaluation", { method:"POST", body });
+    toast(`${t("common.saved")} — ${data.total_score}%`, "success");
+    seLoadAll();
+  } catch (e) { toastError(e); }
+}
+
+function seShowDetail(userId) {
+  window.location.href = `/dashboard?user=${userId}&month=${encodeURIComponent(seEditingMonth(userId))}`;
+}
+
+function seComputePreviewScore(userId) {
+  if (!seKpiConfig || !seKpiConfig.kpis) return null;
+  const freshEl   = document.getElementById(`se-fresh_leads-${userId}`);
+  const freshLeads = freshEl ? Number(freshEl.value) || 0 : 0;
+  let total = 0, totalWeight = 0;
+  Object.entries(seKpiConfig.kpis).forEach(([key, def]) => {
+    const el  = document.getElementById(`se-${key}-${userId}`);
+    if (!el) return;
+    const raw = (el.value || "").trim();
+    if (raw === "") return;
+    const actual = Number(raw);
+    if (isNaN(actual)) return;
+    const target = def.target_type === "leads_pct"
+      ? Math.max(1, freshLeads * (def.target_pct || 0) / 100)
+      : (def.target || 1);
+    total       += Math.min(actual / target, 1) * (def.weight || 0);
+    totalWeight += (def.weight || 0);
+  });
+  return totalWeight ? total : null;
+}
+
+function seRefreshPreview(userId) {
+  const el = document.getElementById(`se-preview-${userId}`);
+  if (!el) return;
+  const score = seComputePreviewScore(userId);
+  if (score == null) { el.textContent = ""; return; }
+  const rating = localRating(score);
+  const cls    = ratingClass(rating).replace("badge-","");
+  el.innerHTML = `<span class="de-preview-label">${t("de.preview_score")}</span>
+                  <span class="de-preview-num is-${cls}">${score.toFixed(1)}%</span>
+                  <span class="de-preview-rating">${t("rating." + rating)}</span>`;
+}
+
+function seRefreshSoftWarn(input) {
+  const max  = SOFT_MAX[input.dataset.kpiKey];
+  if (!max) return;
+  const warn = document.getElementById(`warn-soft-${input.id}`);
+  if (!warn) return;
+  warn.hidden = !(Number(input.value) > max);
+}
+
+function seRefreshCharCount(textarea) {
+  const counter = textarea.dataset.charCounter ? document.getElementById(textarea.dataset.charCounter) : null;
+  if (!counter) return;
+  counter.textContent = `${textarea.value.length}/${textarea.maxLength || 400}`;
+}
+
+let _seFocusAfterReload = null;
+
+document.addEventListener("input", e => {
+  const card = e.target.closest(".de-card[data-user-id]");
+  if (!card) return;
+  const uid = card.dataset.userId;
+  if (e.target.matches("input[data-kpi-key], input[type='hidden'][id^='se-']")) seRefreshPreview(uid);
+  if (e.target.matches("input[data-kpi-key]")) seRefreshSoftWarn(e.target);
+  if (e.target.matches("textarea[data-char-counter]")) seRefreshCharCount(e.target);
+});
+
+document.addEventListener("keydown", e => {
+  if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey)) return;
+  const card = e.target.closest(".de-card[data-user-id]");
+  if (!card) return;
+  e.preventDefault();
+  const userId   = Number(card.dataset.userId);
+  const nextCard = seFindNextPendingAfter(card);
+  _seFocusAfterReload = nextCard ? Number(nextCard.dataset.userId) : null;
+  seSaveEval(userId);
+});
+
+function seFindNextPendingAfter(card) {
+  let n = card.nextElementSibling;
+  while (n) {
+    if (n.matches && n.matches(".de-card[data-user-id]") && !n.classList.contains("is-hidden")) {
+      if (n.dataset.status === "pending" || n.dataset.status === "missing") return n;
+    }
+    n = n.nextElementSibling;
+  }
+  return null;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const tile = document.getElementById('seTilePending');
+  if (!tile) return;
+  const handler = () => {
+    document.getElementById('seFilterStatus').value = 'pending';
+    seApplyFilters();
+    const first = document.querySelector('#seList .de-card[data-status="pending"]:not(.is-hidden)');
+    if (first) {
+      const uid = Number(first.dataset.userId);
+      if (uid) seExpandCard(uid);
+      first.scrollIntoView({ behavior:'smooth', block:'start' });
+    }
+  };
+  tile.addEventListener('click', handler);
+  tile.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); } });
+});
+
+seDrCtrl = DateRange.mount(document.getElementById("seDateRangeHost"), {
+  defaultPreset: "last_30",
+  mode: "full",
+  onChange: () => seLoadAll(),
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TL EVALUATION
+// ══════════════════════════════════════════════════════════════════════════════
+let tlLeaders = [], tlTeams = [], tlTeamsPerf = [];
+let tlUnassignedSummary = { member_count:0, members_submitted:0, members_evaluated:0, members:[] };
+let tlCurrentTL = null, tlKpiData = null;
+let tlDrCtrl = null, tlDrFallbackArmed = true;
+let _tlFilterDebounce = null, _tlLastSearchLen = 0;
+
+async function tlLoadAll() {
+  if (!tlDrCtrl) return;
+  const qs = tlDrCtrl.toQueryString();
+  try {
+    const [ls, ts, tp] = await Promise.all([
+      api(`/api/kpi/team-leaders?${qs}`),
+      tlTeams.length ? Promise.resolve(tlTeams) : api("/api/teams").catch(() => []),
+      api(`/api/kpi/teams-summary?${qs}`).catch(() => ({ teams:[], unassigned:null })),
+    ]);
+    const evaluatedAny = Array.isArray(ls) && ls.some(l => l.dataentry_submitted_at);
+    const tpArr        = Array.isArray(tp) ? tp : (tp.teams || []);
+    const activityAny  = tpArr.some(p => (p.members_evaluated||0) > 0 || (p.total_deals||0) > 0);
+    if (tlDrFallbackArmed && !evaluatedAny && !activityAny && tlDrCtrl.getRange().preset !== "ytd") {
+      tlDrFallbackArmed = false;
+      tlDrCtrl.setRange({ preset:"ytd" });
+      return;
+    }
+    tlDrFallbackArmed  = false;
+    tlLeaders          = ls;
+    tlTeams            = ts || [];
+    tlTeamsPerf        = tpArr;
+    tlUnassignedSummary = (!Array.isArray(tp) && tp.unassigned)
+      ? tp.unassigned
+      : { member_count:0, members_submitted:0, members_evaluated:0, members:[] };
+    tlPopulateTeamFilter();
+    tlRenderTeamsCharts();
+    tlRenderTeamsPerf();
+    tlRender();
+  } catch (e) { tlDrFallbackArmed = false; toastError(e); }
+}
+
+function tlScoreColor(score) {
+  return score >= 75 ? "success" : score >= 55 ? "warn" : "danger";
+}
+
+function tlRenderTeamsCharts() {
+  if (typeof Plotly === 'undefined') return;
+  if (!tlTeamsPerf.length) {
+    ["tlChartRanking","tlChartComposition"].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (Charts.cancelPending) Charts.cancelPending(id);
+      el.innerHTML = `<div class="empty-state" style="padding:40px">${t("tl_eval.no_teams_data")}</div>`;
+    });
+    return;
+  }
+  const sorted = [...tlTeamsPerf].sort((a,b) => (b.avg_member_score||0) - (a.avg_member_score||0));
+  Charts.drawHorizontalBar("tlChartRanking", {
+    x: sorted.map(p => p.avg_member_score||0).reverse(),
+    y: sorted.map(p => p.team_name).reverse(),
+    colors: sorted.map(p => Charts.scoreColorHex(p.avg_member_score||0)).reverse(),
+    labels: sorted.map(p => (p.avg_member_score||0).toFixed(1) + "%").reverse(),
+  });
+  Charts.drawDonut("tlChartComposition", {
+    labels: tlTeamsPerf.map(p => p.team_name),
+    values: tlTeamsPerf.map(p => p.member_count||0),
+    colors: tlTeamsPerf.map((_,i) => Charts.PALETTE[i % Charts.PALETTE.length]),
+  }, { centerText: tlTeamsPerf.reduce((a,p) => a + (p.member_count||0), 0) + "" });
+}
+
+function tlRenderTeamsPerf() {
+  const host = document.getElementById("tlTeamsPerfGrid");
+  if (!host) return;
+  if (!tlTeamsPerf.length) {
+    host.innerHTML = `<div class="pf-empty">${t("tl_eval.no_teams_data")}</div>`;
+    return;
+  }
+  const maxScore = Math.max(1, ...tlTeamsPerf.map(p => p.avg_member_score||0));
+  host.innerHTML = tlTeamsPerf.map(p => {
+    const score        = Number(p.avg_member_score||0);
+    const widthPct     = Math.min(100, (score/maxScore)*100);
+    const submittedPct = p.member_count ? Math.round((p.members_evaluated/p.member_count)*100) : 0;
+    const ldScore      = p.leader_score != null
+      ? `<span class="text-${tlScoreColor(p.leader_score)}">${Number(p.leader_score).toFixed(1)}%</span>`
+      : `<span class="text-muted">${t("tl_eval.pending")}</span>`;
+    const top = p.top_performer
+      ? `${escapeHTML(p.top_performer.name)} <span class="text-muted">(${p.top_performer.score}%)</span>`
+      : `<span class="text-muted">—</span>`;
+    const teamRating = localRating(score);
+    return `<div class="surface-card team-perf-card">
+      <div class="pf-card-head">
+        <div>
+          <div class="pf-card-title">
+            <span class="rank ${p.rank===1?'r1':p.rank===2?'r2':p.rank===3?'r3':''}" style="margin-inline-end:6px">${p.rank}</span>
+            ${escapeHTML(p.team_name)}
+          </div>
+          <div class="pf-card-sub">${t("tl_eval.tl")}: ${escapeHTML(p.leader_name||'—')} · ${ldScore}</div>
+        </div>
+        <span class="badge ${ratingClass(teamRating)}">${score.toFixed(1)}%</span>
+      </div>
+      <div>
+        <div class="text-muted" style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:6px">${t("tl_eval.team_avg")}</div>
+        <div class="bar"><div class="bar-fill ${tlScoreColor(score)}" style="width:${widthPct}%"></div></div>
+      </div>
+      <div class="pf-card-meta">
+        <span class="pf-pill"><span class="material-symbols-outlined pf-pill-icon" aria-hidden="true">groups</span>${p.member_count} ${t("tl_eval.members")}</span>
+        <span class="pf-pill ${submittedPct>=80?'brand':''}"><span class="material-symbols-outlined pf-pill-icon" aria-hidden="true">check_circle</span>${p.members_evaluated}/${p.member_count} ${t("tl_eval.evaluated_short")}</span>
+        ${p.total_leads ? `<span class="pf-pill"><span class="material-symbols-outlined pf-pill-icon" aria-hidden="true">inbox</span>${fmtNum(p.total_leads)} ${t("kpi.fresh_leads")}</span>` : ''}
+        ${p.total_deals ? `<span class="pf-pill accent"><span class="material-symbols-outlined pf-pill-icon" aria-hidden="true">business_center</span>${p.total_deals} ${t("kpi.deals")}</span>` : ''}
+        ${p.total_calls ? `<span class="pf-pill"><span class="material-symbols-outlined pf-pill-icon" aria-hidden="true">call</span>${fmtNum(p.total_calls)} ${t("kpi.calls")}</span>` : ''}
+      </div>
+      <div class="team-perf-top">
+        <span class="material-symbols-outlined" aria-hidden="true">emoji_events</span>
+        <span>${t("tl_eval.top_performer")}: ${top}</span>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function tlPopulateTeamFilter() {
+  const sel = document.getElementById("tlTeamFilter");
+  if (!sel) return;
+  const prev = sel.value;
+  const opts = [
+    `<option value="">${t("common.all")}</option>`,
+    `<option value="none">${t("filters.no_team")}</option>`,
+  ];
+  tlTeams.forEach(team => opts.push(`<option value="${team.id}">${escapeHTML(team.name)}</option>`));
+  sel.innerHTML = opts.join("");
+  if (prev) sel.value = prev;
+}
+
+function tlResetFilters() {
+  document.getElementById("tlTeamFilter").value   = "";
+  document.getElementById("tlStatusFilter").value = "";
+  document.getElementById("tlSearchBox").value    = "";
+  tlRender();
+  const list = document.getElementById("tlList");
+  if (list) try { list.scrollIntoView({ behavior:'smooth', block:'start' }); } catch(_) { list.scrollIntoView(); }
+}
+
+function tlOnSearchInput() {
+  if (_tlFilterDebounce) clearTimeout(_tlFilterDebounce);
+  _tlFilterDebounce = setTimeout(() => {
+    tlRender();
+    const search  = (document.getElementById("tlSearchBox").value || "").trim();
+    const teamVal = document.getElementById("tlTeamFilter").value;
+    const statusV = document.getElementById("tlStatusFilter").value;
+    if (!!(search || teamVal || statusV) && search.length !== _tlLastSearchLen) {
+      const list = document.getElementById("tlList");
+      if (list) try { list.scrollIntoView({ behavior:'smooth', block:'start' }); } catch(_) { list.scrollIntoView(); }
+    }
+    _tlLastSearchLen = search.length;
+  }, 90);
+}
+
+function tlClearChip(id, val) {
+  const el = document.getElementById(id);
+  if (el) { el.value = val; tlRender(); }
+}
+
+function tlRenderChips() {
+  const teamVal  = document.getElementById("tlTeamFilter").value;
+  const statusV  = document.getElementById("tlStatusFilter").value;
+  const search   = document.getElementById("tlSearchBox").value.trim();
+  const chips    = [];
+  if (teamVal) {
+    let label = t("filters.no_team");
+    if (teamVal !== "none") { const tm = tlTeams.find(x => String(x.id) === teamVal); label = tm ? tm.name : teamVal; }
+    chips.push(`<span class="pf-chip">${t("filters.team")}: ${escapeHTML(label)}<button onclick="tlClearChip('tlTeamFilter','')">✕</button></span>`);
+  }
+  if (statusV) {
+    const lbl = statusV === "done" ? t("tl_eval.evaluated") : t("tl_eval.pending");
+    chips.push(`<span class="pf-chip">${t("common.filter")}: ${escapeHTML(lbl)}<button onclick="tlClearChip('tlStatusFilter','')">✕</button></span>`);
+  }
+  if (search) chips.push(`<span class="pf-chip">${t("common.search")}: ${escapeHTML(search)}<button onclick="tlClearChip('tlSearchBox','')">✕</button></span>`);
+  document.getElementById("tlChipsRow").innerHTML = chips.join("");
+}
+
+function tlEditingMonth() {
+  const r = tlDrCtrl ? tlDrCtrl.getRange() : null;
+  if (r && r.monthStr) return r.monthStr;
+  return r ? r.to.slice(0,7) : currentMonth();
+}
+
+function tlRender() {
+  const month   = tlEditingMonth();
+  const teamVal = document.getElementById("tlTeamFilter").value;
+  const statusV = document.getElementById("tlStatusFilter").value;
+  const search  = (document.getElementById("tlSearchBox").value || "").trim().toLowerCase();
+
+  let rows = tlLeaders.slice();
+  if (teamVal === "none") rows = rows.filter(l => l.team_id == null);
+  else if (teamVal) rows = rows.filter(l => String(l.team_id||"") === teamVal);
+  if (statusV === "done")    rows = rows.filter(l =>  l.dataentry_submitted_at);
+  if (statusV === "pending") rows = rows.filter(l => !l.dataentry_submitted_at);
+  if (search) rows = rows.filter(l =>
+    (l.full_name||"").toLowerCase().includes(search) ||
+    (l.username||"").toLowerCase().includes(search) ||
+    (l.team_name||"").toLowerCase().includes(search));
+
+  const evaluated = tlLeaders.filter(l => l.dataentry_submitted_at).length;
+  document.getElementById("tlProgress").textContent =
+    `${t("tl_eval.progress")} ${evaluated} ${t("common.of")} ${tlLeaders.length}  ·  ${t("filters.shown")} ${rows.length}`;
+  tlRenderChips();
+
+  const showUnassigned = tlUnassignedSummary.member_count > 0 && (!teamVal || teamVal === "none");
+  const unassignedHTML = showUnassigned ? tlRenderUnassignedCard() : "";
+
+  const tlListHTML = rows.length === 0
+    ? `<div class="empty-state"><div class="empty-state-icon"><span class="material-symbols-outlined" aria-hidden="true">person_off</span></div><div>${t("tl_eval.no_tl")}</div></div>`
+    : rows.map(l => {
+        const done         = !!l.dataentry_submitted_at;
+        const teamName     = l.team_name || t("tl_eval.no_team");
+        const statusCls    = done ? "badge-excellent" : "badge-pending";
+        const statusTxt    = done ? t("tl_eval.evaluated") : t("tl_eval.pending");
+        const btnTxt       = done ? t("tl_eval.edit") : t("tl_eval.evaluate");
+        const teamPerf     = tlTeamsPerf.find(p => p.team_id === l.team_id);
+        const teamScore    = teamPerf ? teamPerf.avg_member_score : null;
+        const teamScoreBadge = teamScore != null
+          ? `<span class="badge ${ratingClass(localRating(teamScore))}" title="${t('tl_eval.team_avg')}">${t('tl_eval.team_avg')}: ${teamScore.toFixed(1)}%</span>`
+          : "";
+        const memberCount  = teamPerf ? (teamPerf.member_count||0) : 0;
+        const membersHTML  = teamPerf && Array.isArray(teamPerf.members) && teamPerf.members.length
+          ? teamPerf.members.map(tlMemberRowHTML).join("")
+          : `<div class="text-muted" style="padding:8px 4px;font-size:13px">${t("tl_eval.no_members")}</div>`;
+        return `<div class="card tl-eval-card" style="margin-bottom:14px">
+          <div class="tl-eval-card-head">
+            <div class="avatar">${escapeHTML((l.full_name||"?")[0])}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;font-size:15px">${escapeHTML(l.full_name)}</div>
+              <div style="font-size:12px;color:var(--text-muted)">${escapeHTML(teamName)}</div>
+            </div>
+            ${teamScoreBadge}
+            <span class="badge ${statusCls}">${statusTxt}</span>
+            <button class="btn btn-sm btn-primary" onclick="tlOpenEval(${l.id},'${escapeHTML(l.full_name)}','${month}')">
+              ${btnTxt}
+            </button>
+          </div>
+          ${memberCount > 0 ? `
+          <details class="tl-eval-members">
+            <summary>
+              <span class="material-symbols-outlined" aria-hidden="true">groups</span>
+              <span class="tl-eval-members-label" data-collapsed="${escapeHTML(t('tl_eval.expand_team'))}" data-expanded="${escapeHTML(t('tl_eval.collapse_team'))}">${t("tl_eval.expand_team")}</span>
+              <span class="text-muted" style="font-size:12px">· ${memberCount} ${t("tl_eval.members")}</span>
+              <span class="material-symbols-outlined tl-eval-members-chev" aria-hidden="true">expand_more</span>
+            </summary>
+            <div class="tl-members-list" style="margin-top:10px">${membersHTML}</div>
+          </details>` : ""}
+        </div>`;
+      }).join("");
+
+  document.getElementById("tlList").innerHTML = unassignedHTML + tlListHTML;
+}
+
+function tlMemberRowHTML(m) {
+  const score       = m.total_score == null ? null : Number(m.total_score);
+  const rating      = m.rating || (score != null ? localRating(score) : null);
+  const ratingBadge = rating ? `<span class="badge ${ratingClass(rating)}">${t("rating." + rating)}</span>` : "";
+  const scoreCell   = score != null
+    ? `<span class="tl-member-score">${score.toFixed(1)}%</span>`
+    : `<span class="tl-member-score is-empty">${t("tl.member_no_score")}</span>`;
+  const statusBadge = (() => {
+    const map = { evaluated:{cls:"badge-excellent",key:"tl.member_status_evaluated"}, submitted:{cls:"badge-pending",key:"tl.member_status_submitted"}, pending:{cls:"badge-pending",key:"tl.member_status_pending"} };
+    const x = map[m.status] || map.pending;
+    return `<span class="badge ${x.cls}">${t(x.key)}</span>`;
+  })();
+  const initial      = escapeHTML((m.full_name||"?").trim().charAt(0));
+  const avatarMarkup = m.avatar_url
+    ? `<div class="avatar avatar-sm avatar-img"><img src="${escapeHTML(m.avatar_url)}" alt=""></div>`
+    : `<div class="avatar avatar-sm">${initial}</div>`;
+  return `<div class="tl-member-row" data-status="${escapeHTML(m.status||"")}">
+    ${avatarMarkup}
+    <div class="tl-member-name"><div class="tl-member-name-line">${escapeHTML(m.full_name||"—")}</div></div>
+    ${statusBadge}${ratingBadge}${scoreCell}
+  </div>`;
+}
+
+function tlRenderUnassignedCard() {
+  const u = tlUnassignedSummary;
+  const memberHTML = u.members.length
+    ? u.members.map(tlMemberRowHTML).join("")
+    : `<div class="text-muted" style="padding:8px 4px;font-size:13px">${t("tl_eval.no_members")}</div>`;
+  return `<div class="card tl-eval-unassigned-card" style="margin-bottom:18px">
+    <div class="tl-eval-unassigned-head">
+      <div class="tl-eval-unassigned-icon"><span class="material-symbols-outlined" aria-hidden="true">person_off</span></div>
+      <div style="flex:1;min-width:0">
+        <div class="tl-eval-unassigned-title">${t("tl_eval.unassigned_title")}</div>
+        <div class="tl-eval-unassigned-hint">${t("tl_eval.unassigned_hint")}</div>
+      </div>
+      <span class="badge badge-pending">${t("tl_eval.unassigned_count").replace("{n}", u.member_count)}</span>
+      <a href="/teams" class="btn btn-sm">
+        <span class="material-symbols-outlined" aria-hidden="true">groups</span>
+        <span>${t("tl_eval.unassigned_assign")}</span>
+      </a>
+    </div>
+    <div class="tl-members-list" style="margin-top:14px">${memberHTML}</div>
+  </div>`;
+}
+
+async function tlOpenEval(tlId, tlName, month) {
+  tlCurrentTL = { id:tlId, name:tlName, month };
+  document.getElementById("tlModalTitle").textContent = tlName;
+  document.getElementById("tlModalBody").innerHTML   = `<div class="text-muted">${t("common.loading")}</div>`;
+  openModal("tlEvalModal");
+  try {
+    tlKpiData = await api(`/api/kpi/tl-kpi/${tlId}/${month}`).catch(() => null);
+    const entry      = tlKpiData ? tlKpiData.tl_entry : {};
+    const autoSection = tlKpiData ? tlRenderAutoSection(tlKpiData) : "";
+    tlRenderForm(entry, autoSection);
+    if (tlKpiData && tlKpiData.breakdown) {
+      setTimeout(() => {
+        const labels = Object.keys(tlKpiData.breakdown).map(k => t("kpi." + k));
+        const values = Object.values(tlKpiData.breakdown).map(v => v.achievement_pct);
+        const radarEl = document.getElementById("tlRadar");
+        if (radarEl && typeof Plotly !== 'undefined') Charts.drawRadarChart("tlRadar", { labels, values });
+      }, 80);
+    }
+  } catch (e) { tlRenderForm({}, ""); }
+}
+
+function tlRenderAutoSection(data) {
+  if (!data || !data.breakdown) return "";
+  const autoKeys = ["calls","meetings","deals","reservations","followup_pct"];
+  const rows = autoKeys.map(key => {
+    const b = data.breakdown[key];
+    if (!b) return "";
+    const col = Charts.scoreColorHex(b.achievement_pct);
+    return `<div class="kpi-row" style="grid-template-columns:1fr 2fr 1fr">
+      <div class="kpi-label">${t("kpi." + key)}</div>
+      <div class="kpi-bar-wrap"><div class="kpi-bar" style="width:${Math.min(b.achievement_pct,100)}%;background:${col}"></div></div>
+      <div class="kpi-nums">
+        <span class="actual">${b.actual}</span><span class="sep">/</span>
+        <span class="target">${b.target}</span>
+        <span class="pct">${b.achievement_pct}%</span>
+      </div>
+    </div>`;
+  }).join("");
+  const ratingTxt = data.rating ? t("rating." + data.rating) : "—";
+  const score     = (data.total_score || 0).toFixed(1);
+  return `<div class="bento" style="margin-bottom:16px">
+    <div class="span-7">
+      <div class="form-section" style="margin:0">
+        <div class="form-section-title">${t("tl_eval.team_auto")}</div>
+        ${rows}
+      </div>
+    </div>
+    <div class="span-5">
+      <div class="form-section" style="margin:0;height:100%">
+        <div class="form-section-title">${t("dash.metric_pillars")}</div>
+        <div id="tlRadar" class="plotly-container short" style="min-height:240px"></div>
+        <div class="text-center" style="margin-top:8px">
+          <div style="font-size:24px;font-weight:800;font-family:Inter;color:var(--brand)">${score}%</div>
+          <div class="text-muted" style="font-size:12px;font-weight:600">${ratingTxt}</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function tlRenderForm(entry, autoHtml) {
+  const v = (key, def="0") => entry[key] !== undefined ? entry[key] : def;
+  document.getElementById("tlModalBody").innerHTML = `
+    ${autoHtml}
+    <div class="form-section">
+      <div class="form-section-title">${t("tl_eval.manual_fields")}</div>
+      <div class="field-row">
+        <div class="field">
+          <label>${t("kpi.crm_own")} %</label>
+          <input type="number" min="0" max="100" id="tl_f_crm_pct" value="${v("crm_pct")}">
+        </div>
+        <div class="field">
+          <label>${t("kpi.reports")}</label>
+          <input type="number" min="0" id="tl_f_reports" value="${v("reports")}">
+        </div>
+      </div>
+      <div class="field">
+        <label>${t("kpi.clients_pipeline")} %</label>
+        <input type="number" min="0" max="100" id="tl_f_clients_pipeline" value="${v("clients_pipeline")}">
+      </div>
+      <div class="form-section-title" style="margin-top:14px">${t("tl_eval.personal_eval")}</div>
+      <div class="field-row">
+        ${tlPassfailField("tl_f_attitude",     t("kpi.attitude"),      v("attitude"))}
+        ${tlPassfailField("tl_f_presentation", t("kpi.presentation"),  v("presentation"))}
+      </div>
+      <div class="field-row">
+        ${tlPassfailField("tl_f_behaviour",    t("kpi.behaviour"),     v("behaviour"))}
+        ${tlPassfailField("tl_f_appearance",   t("kpi.appearance"),    v("appearance"))}
+      </div>
+      <div class="field-row">
+        ${tlPassfailField("tl_f_attendance_pct", t("kpi.attendance_pct"), v("attendance_pct"))}
+        ${tlPassfailField("tl_f_hr_roles",     t("kpi.hr_roles"),      v("hr_roles"))}
+      </div>
+      <div class="field" style="margin-top:8px">
+        <label>${t("tl_eval.notes")}</label>
+        <textarea id="tl_f_notes" rows="2" style="width:100%">${escapeHTML(entry.notes||"")}</textarea>
+      </div>
+    </div>`;
+}
+
+function tlPassfailField(id, label, val) {
+  const isPass = Number(val) === 100;
+  return `<div class="field">
+    <label>${label}</label>
+    <div class="passfail-toggle" role="radiogroup" aria-label="${escapeHTML(label)}">
+      <button type="button" role="radio" aria-checked="${isPass}" data-pf-target="${id}" data-pf-value="100" class="${isPass?'is-active':''}">${t("common.pass")}</button>
+      <button type="button" role="radio" aria-checked="${!isPass}" data-pf-target="${id}" data-pf-value="0" class="${!isPass?'is-active':''}">${t("common.fail")}</button>
+    </div>
+    <input type="hidden" id="${id}" value="${isPass?100:0}">
+  </div>`;
+}
+
+async function tlSaveEval() {
+  if (!tlCurrentTL) return;
+  const body = {
+    user_id:          tlCurrentTL.id,
+    month:            tlCurrentTL.month,
+    crm_pct:          parseFloat(document.getElementById("tl_f_crm_pct").value)||0,
+    reports:          parseInt(document.getElementById("tl_f_reports").value)||0,
+    clients_pipeline: parseFloat(document.getElementById("tl_f_clients_pipeline").value)||0,
+    attitude:         parseInt(document.getElementById("tl_f_attitude").value)||0,
+    presentation:     parseInt(document.getElementById("tl_f_presentation").value)||0,
+    behaviour:        parseInt(document.getElementById("tl_f_behaviour").value)||0,
+    appearance:       parseInt(document.getElementById("tl_f_appearance").value)||0,
+    attendance_pct:   parseFloat(document.getElementById("tl_f_attendance_pct").value)||0,
+    hr_roles:         parseInt(document.getElementById("tl_f_hr_roles").value)||0,
+    notes:            document.getElementById("tl_f_notes").value||"",
+  };
+  try {
+    await api("/api/kpi/submit/tl-evaluation", { method:"POST", body });
+    toast(t("common.saved"), "success");
+    closeModal("tlEvalModal");
+    tlLoadAll();
+  } catch (e) { toastError(e); }
+}
+
+// ── Shared lang/theme hooks ────────────────────────────────────────────────────
+function onLangChange() {
+  if (seDrCtrl) seDrCtrl.refreshLabels();
+  if (tlDrCtrl) { tlDrCtrl.refreshLabels(); tlUpdateRangeWarning(tlDrCtrl.getRange()); }
+
+  // SE: preserve drafts across full rebuild
+  const drafts = new Map();
+  document.querySelectorAll('#seList input, #seList textarea, #seList select').forEach(el => {
+    if (el.id) drafts.set(el.id, el.value);
+  });
+  const visibleWarns  = new Set();
+  const expandedCards = new Set();
+  document.querySelectorAll('#seList .de-warn:not([hidden])').forEach(w => { if (w.id) visibleWarns.add(w.id); });
+  document.querySelectorAll('#seList .de-card.is-expanded').forEach(c => { if (c.dataset.userId) expandedCards.add(Number(c.dataset.userId)); });
+
+  seRenderAll();
+  expandedCards.forEach(uid => seExpandCard(uid));
+  drafts.forEach((value, id) => { const el = document.getElementById(id); if (el) el.value = value; });
+  visibleWarns.forEach(id => { const w = document.getElementById(id); if (w) w.hidden = false; });
+  document.querySelectorAll('#seList .passfail-toggle').forEach(group => {
+    const firstBtn = group.querySelector('button[data-pf-target]');
+    if (!firstBtn) return;
+    const hidden = document.getElementById(firstBtn.getAttribute('data-pf-target'));
+    if (!hidden) return;
+    const want = String(hidden.value);
+    group.querySelectorAll('button').forEach(b => {
+      const active = b.getAttribute('data-pf-value') === want;
+      b.classList.toggle('is-active', active);
+      b.setAttribute('aria-checked', active ? 'true' : 'false');
+    });
+  });
+  document.querySelectorAll('#seList .card[data-user-id]').forEach(card => seRefreshPreview(card.dataset.userId));
+  document.querySelectorAll('#seList textarea[data-char-counter]').forEach(ta => seRefreshCharCount(ta));
+  document.querySelectorAll('#seList input[data-kpi-key]').forEach(inp => seRefreshSoftWarn(inp));
+
+  if (_tlTabInited) { tlRender(); tlRenderTeamsCharts(); tlRenderTeamsPerf(); }
+}
+
+function onThemeChange() {
+  seRenderTilesAndCharts();
+  if (_tlTabInited) { tlRenderTeamsCharts(); tlRenderTeamsPerf(); }
+}
+
+function tlUpdateRangeWarning(range) {
+  const host = document.getElementById("tlRangeWarning");
+  const txt  = document.getElementById("tlRangeWarningText");
+  if (!host || !txt) return;
+  if (range && range.isSubMonth) { txt.innerHTML = t("tl_eval.range_warning_submonth"); host.hidden = false; }
+  else host.hidden = true;
+}
+
+// Init TL date range picker only when the element exists (manager/admin only)
+const _tlDREl = document.getElementById("tlDateRangeHost");
+if (_tlDREl) {
+  tlDrCtrl = DateRange.mount(_tlDREl, {
+    defaultPreset: "last_30",
+    mode: "full",
+    onChange: range => { tlUpdateRangeWarning(range); if (_tlTabInited) tlLoadAll(); },
+  });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Ain KPI{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
+  <link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.svg') }}">
+  <!-- Apply language before render to prevent Arabic flash in EN mode.
+       URL `?lang=` overrides localStorage — used by transactional email
+       links so the page opens in the same skin as the email. -->
+  <script>(function(){try{var q=new URLSearchParams(window.location.search);var ql=(q.get('lang')||'').toLowerCase();if(ql==='ar'||ql==='en'){localStorage.setItem('ain_lang',ql);}}catch(_){}var l=localStorage.getItem('ain_lang')||'ar';document.documentElement.lang=l;document.documentElement.dir=l==='ar'?'rtl':'ltr';document.documentElement.className=l==='en'?'lang-en':'';})()</script>
+  <!-- Apply theme before render to prevent flash. URL `?theme=` overrides
+       localStorage (email links); otherwise manual localStorage choice
+       wins; otherwise we follow the OS preference (prefers-color-scheme). -->
+  <script>(function(){try{var q=new URLSearchParams(window.location.search);var qt=(q.get('theme')||'').toLowerCase();if(qt==='dark'||qt==='light'){localStorage.setItem('ain_theme',qt);}}catch(_){}var t=localStorage.getItem('ain_theme');if(!t){t=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);})()</script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=flat64">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <div class="app-shell {% if user %}has-sidebar{% endif %}">
+    {% if user %}
+    <aside class="sidebar" id="sidebar" role="dialog" aria-modal="true" aria-labelledby="sidebarBrandName" data-mobile-drawer="true" tabindex="-1">
+      <a href="/" class="sidebar-brand">
+        <div class="topnav-brand-icon">{% include "_logo_mark.html" %}</div>
+        <div class="sidebar-brand-text">
+          <span class="sidebar-brand-name" id="sidebarBrandName" data-i18n="app.name">Ain Real Estate</span>
+          <span class="sidebar-brand-tag" data-i18n="app.tagline">KPI Management</span>
+        </div>
+      </a>
+
+      {# Sales role only sees PropFinder. Other roles see role-scoped links. #}
+      {% if user.role != 'sales' %}
+        <div class="sidebar-section-label" data-i18n="nav.section_main"></div>
+
+        {% if user.role in ['admin', 'manager', 'dataentry'] %}
+          <a href="/dashboard" class="sidebar-link {% if request.path == '/dashboard' %}active{% endif %}">
+            <span class="sidebar-link-icon"><span class="material-symbols-outlined">dashboard</span></span>
+            <span data-i18n="nav.dashboard"></span>
+          </a>
+        {% endif %}
+
+        {% if user.role in ['marketing', 'manager', 'admin'] %}
+          <a href="/marketing" class="sidebar-link {% if request.path == '/marketing' %}active{% endif %}">
+            <span class="sidebar-link-icon"><span class="material-symbols-outlined">campaign</span></span>
+            <span data-i18n="nav.marketing"></span>
+          </a>
+          <a href="/marketing/intervention" class="sidebar-link {% if request.path == '/marketing/intervention' %}active{% endif %}">
+            <span class="sidebar-link-icon"><span class="material-symbols-outlined">flag</span></span>
+            <span data-i18n="nav.intervention"></span>
+            <span class="sidebar-badge" id="navInterventionBadge" hidden></span>
+          </a>
+          <a href="/crm-reports" class="sidebar-link {% if request.path == '/crm-reports' %}active{% endif %}">
+            <span class="sidebar-link-icon"><span class="material-symbols-outlined">cloud_upload</span></span>
+            <span data-i18n="nav.crm_reports"></span>
+          </a>
+        {% endif %}
+
+        {% if user.role == 'team_leader' %}
+          <a href="/team-leader" class="sidebar-link {% if request.path == '/team-leader' %}active{% endif %}">
+            <span class="sidebar-link-icon"><span class="material-symbols-outlined">analytics</span></span>
+            <span data-i18n="nav.team_leader"></span>
+          </a>
+        {% endif %}
+
+        {% if user.role in ['admin', 'manager', 'dataentry'] %}
+          <a href="/evaluation" class="sidebar-link {% if request.path == '/evaluation' %}active{% endif %}">
+            <span class="sidebar-link-icon"><span class="material-symbols-outlined">assignment</span></span>
+            <span data-i18n="nav.evaluation"></span>
+          </a>
+        {% endif %}
+
+        {% if user.role in ['admin', 'manager'] %}
+          <a href="/finance" class="sidebar-link {% if request.path == '/finance' %}active{% endif %}">
+            <span class="sidebar-link-icon"><span class="material-symbols-outlined">payments</span></span>
+            <span data-i18n="nav.finance"></span>
+          </a>
+        {% endif %}
+
+        {% if user.role in ['admin', 'manager', 'dataentry'] %}
+          <div class="sidebar-section-label" data-i18n="nav.section_admin"></div>
+          <a href="/admin" class="sidebar-link {% if request.path == '/admin' %}active{% endif %}">
+            <span class="sidebar-link-icon"><span class="material-symbols-outlined">manage_accounts</span></span>
+            <span data-i18n="nav.admin"></span>
+          </a>
+          {% if user.role == 'admin' %}
+          <a href="/teams" class="sidebar-link {% if request.path == '/teams' %}active{% endif %}">
+            <span class="sidebar-link-icon"><span class="material-symbols-outlined">groups</span></span>
+            <span data-i18n="nav.teams"></span>
+          </a>
+          {# CRM Settings — admin-only because adding a mapping triggers
+             retroactive recalc that rewrites historical KPIs. #}
+          <a href="/admin/crm-settings" class="sidebar-link {% if request.path == '/admin/crm-settings' %}active{% endif %}">
+            <span class="sidebar-link-icon"><span class="material-symbols-outlined">tune</span></span>
+            <span data-i18n="nav.crm_settings"></span>
+          </a>
+          {% endif %}
+        {% endif %}
+
+        <div class="sidebar-section-label" data-i18n="nav.section_tools"></div>
+      {% endif %}
+
+      <a href="/propfinder" class="sidebar-link {% if request.path == '/propfinder' %}active{% endif %}">
+        <span class="sidebar-link-icon"><span class="material-symbols-outlined">domain</span></span>
+        <span data-i18n="nav.propfinder"></span>
+      </a>
+
+      <div class="sidebar-spacer"></div>
+      <div class="sidebar-divider"></div>
+      <a href="/profile" class="sidebar-link {% if request.path == '/profile' %}active{% endif %}">
+        <span class="sidebar-link-icon"><span class="material-symbols-outlined">person</span></span>
+        <span data-i18n="nav.profile"></span>
+      </a>
+      <button class="sidebar-link is-logout" onclick="logout()">
+        <span class="sidebar-link-icon"><span class="material-symbols-outlined">logout</span></span>
+        <span data-i18n="nav.logout"></span>
+      </button>
+    </aside>
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar(false)" aria-hidden="true"></div>
+
+    <nav class="topnav">
+      <button class="topnav-burger" id="navBurger" data-i18n-aria-label="common.menu" aria-label="Menu" aria-expanded="false" aria-controls="sidebar">
+        <span></span><span></span><span></span>
+      </button>
+
+      <a href="/" class="topnav-brand">
+        <div class="topnav-brand-icon">{% include "_logo_mark.html" %}</div>
+        <span data-i18n="app.name">Ain Real Estate</span>
+      </a>
+
+      {# Inline links remain available for legacy mobile fallback; sidebar takes over on desktop. #}
+      <div class="topnav-links" id="navLinks"></div>
+
+      <div class="topnav-actions">
+        <button id="themeToggleBtn" class="theme-toggle" data-i18n-title="nav.theme_toggle" data-i18n-aria-label="nav.theme_toggle" title="Theme" aria-label="Theme">
+          <span class="material-symbols-outlined theme-toggle-icon-light" aria-hidden="true">light_mode</span>
+          <span class="material-symbols-outlined theme-toggle-icon-dark" aria-hidden="true">dark_mode</span>
+        </button>
+        <button id="langToggleBtn" class="lang-toggle" data-i18n-title="nav.language_toggle" title="Language">EN</button>
+        <div class="topnav-user" id="userMenuTrigger">
+          <div class="avatar {% if user.avatar_url %}avatar-img{% endif %}">
+            {% if user.avatar_url %}<img src="{{ user.avatar_url }}" alt="{{ user.full_name }}">{% else %}{{ user.full_name[0] if user.full_name else 'U' }}{% endif %}
+          </div>
+          <div class="user-info">
+            <span class="name">{{ user.full_name }}</span>
+            <span class="role" data-i18n="role.{{ user.role }}">{{ user.role }}</span>
+          </div>
+          <div class="dropdown">
+            <a href="/profile" class="dropdown-item" data-i18n="nav.profile"></a>
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item danger" onclick="logout()" data-i18n="nav.logout"></button>
+          </div>
+        </div>
+      </div>
+    </nav>
+    {% endif %}
+
+    <main class="main {% block main_class %}{% endblock %}">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/i18n.js') }}?v=flat63"></script>
+  <script src="{{ url_for('static', filename='js/common.js') }}?v=flat63"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

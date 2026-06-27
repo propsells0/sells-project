@@ -1,0 +1,855 @@
+{% extends "base.html" %}
+{% block title %}Ain KPI{% endblock %}
+
+{% block head %}
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title" data-i18n="fin.title"></h1>
+    <p class="page-subtitle" data-i18n="fin.subtitle"></p>
+  </div>
+  <div class="flex gap-2">
+    <button class="btn" onclick="window.print()" data-i18n="common.print"></button>
+    <button class="btn btn-primary" onclick="exportCSV()" data-i18n="common.export"></button>
+  </div>
+</div>
+
+<!-- Top financial tiles (powered by computed totals).
+     Click any tile to expand a per-month breakdown of that metric in
+     the panel below. -->
+<div class="bento" id="topTotals"></div>
+<div id="finTileBreakdown" class="fin-tile-breakdown" hidden></div>
+
+<div class="controls">
+  <div class="field">
+    <label data-i18n="common.month"></label>
+    <div id="dateRangeHost"></div>
+  </div>
+  <div class="field">
+    <label data-i18n="fin.avg_deal"></label>
+    <input type="number" id="avgDeal" onchange="loadAll()" style="width:180px">
+  </div>
+  <div class="field">
+    <label data-i18n="fin.commission_rate"></label>
+    <input type="number" id="commissionRate" step="0.1" onchange="loadAll()" style="width:140px">
+  </div>
+  <div class="spacer"></div>
+</div>
+
+<!-- Contextual range warning — shown when sub-month preset is selected.
+     min-height host reserves the slot so toggling doesn't shift layout. -->
+<div class="dr-context-warning-host" id="rangeWarningHost" aria-live="polite">
+  <div class="dr-context-warning" id="rangeWarning" hidden>
+    <span class="material-symbols-outlined" aria-hidden="true">warning</span>
+    <div class="dr-context-warning-text" id="rangeWarningText"></div>
+  </div>
+</div>
+
+<!-- Secondary stats -->
+<div class="stats-grid stagger" id="totals"></div>
+
+<!-- Charts row 1: revenue trend (line) full width -->
+<div class="chart-card">
+  <h3 data-i18n="fin.chart_monthly_trend"></h3>
+  <div id="chartTrend" class="plotly-container tall"></div>
+</div>
+
+<!-- Charts row 2a: revenue treemap — gets full width because it carries
+     the most categorical detail (one tile per rep) and was unreadably
+     cramped at span-4. Subtitle hint clarifies what tiles represent.
+     Top-N selector trims the long tail into an "Others" bucket; clicking
+     any tile opens a per-rep monthly breakdown panel below the chart. -->
+<div class="chart-card">
+  <div class="chart-card-head">
+    <h3>
+      <span data-i18n="fin.chart_revenue_treemap"></span>
+      <span class="chart-card-hint" data-i18n="fin.treemap_hint"></span>
+    </h3>
+    <div class="chart-card-controls">
+      <label class="chart-card-control">
+        <span data-i18n="fin.treemap_show"></span>
+        <select id="treemapTopN" onchange="onTreemapTopNChange()">
+          <option value="5">Top 5</option>
+          <option value="10" selected>Top 10</option>
+          <option value="20">Top 20</option>
+          <option value="50">Top 50</option>
+          <option value="all" data-i18n="common.all"></option>
+        </select>
+      </label>
+    </div>
+  </div>
+  <div id="chartTreemap" class="plotly-container tall"></div>
+  <div class="chart-card-hint" data-i18n="fin.treemap_click_hint" style="padding:8px 4px 0;display:block"></div>
+</div>
+<div id="treemapBreakdown" class="fin-tile-breakdown" hidden></div>
+
+<!-- Charts row 2b: deal vs reservation breakdowns side-by-side. -->
+<div class="bento">
+  <div class="chart-card span-6">
+    <h3 data-i18n="fin.chart_revenue_split"></h3>
+    <div id="chartRevenueSplit" class="plotly-container"></div>
+  </div>
+  <div class="chart-card span-6">
+    <h3 data-i18n="fin.chart_commission_split"></h3>
+    <div id="chartCommission" class="plotly-container"></div>
+  </div>
+</div>
+
+<!-- Charts row 3: revenue by rep (bar) + deals/reservations stacked -->
+<div class="bento">
+  <div class="chart-card span-7">
+    <h3 data-i18n="fin.chart_revenue_by_sales"></h3>
+    <div id="chartRevenue" class="plotly-container tall"></div>
+  </div>
+  <div class="chart-card span-5">
+    <h3 data-i18n="fin.deals_vs_reservations"></h3>
+    <div id="chartDealsRes" class="plotly-container tall"></div>
+  </div>
+</div>
+
+<!-- Detailed table -->
+<div class="card-title mb-2" style="margin-top:8px">
+  <span data-i18n="fin.title"></span>
+</div>
+<div class="table-wrap reveal">
+  <table>
+    <thead><tr>
+      <th style="width:50px">#</th>
+      <th data-i18n="admin.user"></th>
+      <th data-i18n="fin.deals_count"></th>
+      <th data-i18n="fin.reservations_count"></th>
+      <th data-i18n="fin.deal_revenue"></th>
+      <th data-i18n="fin.reservation_revenue"></th>
+      <th data-i18n="fin.total_revenue"></th>
+      <th data-i18n="fin.total_commission"></th>
+    </tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}?v=flat51"></script>
+<script src="{{ url_for('static', filename='js/date_range.js') }}?v=flat51"></script>
+<script>
+let reportData = null;
+let trendData = null;
+let _drCtrl = null;
+let _drFallbackArmed = true;  // auto-widen to YTD on empty first load
+
+// Persist user-tuned defaults across visits — these are org-wide constants
+// the manager rarely changes, but should not have to retype every load.
+const FIN_AVGDEAL_KEY = "ain_fin_avgDeal";
+const FIN_COMMRATE_KEY = "ain_fin_commRate";
+
+function _seedFinanceDefaults() {
+  const avg = document.getElementById("avgDeal");
+  const rate = document.getElementById("commissionRate");
+  if (avg && !avg.value)  avg.value  = localStorage.getItem(FIN_AVGDEAL_KEY)  || "2500000";
+  if (rate && !rate.value) rate.value = localStorage.getItem(FIN_COMMRATE_KEY) || "2.5";
+}
+
+async function loadAll() {
+  _seedFinanceDefaults();
+  if (!_drCtrl) return;
+  const avgDeal = parseFloat(document.getElementById("avgDeal").value) || 2500000;
+  const commRate = (parseFloat(document.getElementById("commissionRate").value) || 2.5) / 100;
+  if (avgDeal <= 0 || commRate < 0) return toast(t("errors.invalid_input"), "error");
+  try { localStorage.setItem(FIN_AVGDEAL_KEY,  String(avgDeal)); } catch {}
+  try { localStorage.setItem(FIN_COMMRATE_KEY, String(commRate * 100)); } catch {}
+  try {
+    const qs = _drCtrl.toQueryString({
+      avg_deal_value_egp: avgDeal,
+      commission_rate: commRate,
+    });
+    // Report + trend are independent — fetch in parallel.
+    const [report, trend] = await Promise.all([
+      api(`/api/finance/report?${qs}`),
+      api("/api/finance/trend?months_back=6"),
+    ]);
+    if (_drFallbackArmed
+        && (!report || !report.totals || (report.totals.sales_count || 0) === 0)
+        && _drCtrl.getRange().preset !== "ytd") {
+      _drFallbackArmed = false;
+      _drCtrl.setRange({ preset: "ytd" });
+      return;
+    }
+    _drFallbackArmed = false;
+    reportData = report;
+    trendData = trend;
+    render();
+  } catch (e) { _drFallbackArmed = false; toastError(e); }
+}
+
+function render() {
+  if (!reportData) return;
+  // Drop any open drill-downs from the previous range so users don't see
+  // a panel for a rep who no longer matches the filter.
+  closeTileBreakdown();
+  closeTreemapBreakdown();
+  const totals = reportData.totals;
+  const breakdown = reportData.breakdown;
+  renderTopTiles(totals);
+  renderTotals(totals);
+  renderCharts(breakdown);
+  renderTable(breakdown);
+  renderTrend();
+}
+
+function renderTopTiles(totals) {
+  const totalDeals = totals.total_deals || 0;
+  const totalRes   = totals.total_reservations || 0;
+  document.getElementById("topTotals").innerHTML = `
+    <div class="kpi-tile tile-brand span-3 is-clickable" id="ftile_revenue" data-i18n-aria-label="dash.tile_action_revenue" tabindex="0" role="button">
+      <div class="kpi-tile-head"><div class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">payments</span></div><div class="kpi-tile-label" data-i18n="fin.total_revenue"></div></div>
+      <div class="kpi-tile-value money-compact">${fmtCompactMoney(totals.total_revenue)}</div>
+      <div class="kpi-tile-sub">${t("fin.egp")}</div>
+    </div>
+    <div class="kpi-tile tile-accent span-3 is-clickable" id="ftile_commission" data-i18n-aria-label="dash.tile_action_commission" tabindex="0" role="button">
+      <div class="kpi-tile-head"><div class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">track_changes</span></div><div class="kpi-tile-label" data-i18n="fin.total_commission"></div></div>
+      <div class="kpi-tile-value money-compact">${fmtCompactMoney(totals.total_commission)}</div>
+      <div class="kpi-tile-sub">${t("fin.egp")}</div>
+    </div>
+    <div class="kpi-tile tile-coral span-3 is-clickable" id="ftile_deals" data-i18n-aria-label="dash.tile_action_deals" tabindex="0" role="button">
+      <div class="kpi-tile-head"><div class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">business_center</span></div><div class="kpi-tile-label" data-i18n="fin.total_deals"></div></div>
+      <div class="kpi-tile-value">${totalDeals}</div>
+      <div class="kpi-tile-sub">${totalDeals ? fmtCompactMoney(totals.total_revenue / totalDeals) + " " + t("fin.deal_value") : ''}</div>
+    </div>
+    <div class="kpi-tile tile-violet span-3 is-clickable" id="ftile_reservations" data-i18n-aria-label="dash.tile_action_reservations" tabindex="0" role="button">
+      <div class="kpi-tile-head"><div class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">handshake</span></div><div class="kpi-tile-label" data-i18n="fin.total_reservations"></div></div>
+      <div class="kpi-tile-value">${totalRes}</div>
+      <div class="kpi-tile-sub">&nbsp;</div>
+    </div>
+  `;
+  if (typeof applyLang === 'function') applyLang(true);
+  _wireFinanceTileClicks();
+}
+
+// Finance tile click actions:
+//  1. Sort the by-rep table on the chosen dimension (existing behaviour).
+//  2. Toggle an inline per-month breakdown panel just under the tiles
+//     showing that metric's value broken out by date.
+//
+// Clicking the same tile again closes the panel; clicking a different
+// tile switches metrics without closing.
+let _financeSort = 'total_revenue';
+let _activeBreakdownMetric = null;
+
+function _wireFinanceTileClicks() {
+  const wire = (id, metricKey) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const handler = () => {
+      _financeSort = metricKey;
+      if (reportData) {
+        renderTable(reportData.breakdown);
+        toggleTileBreakdown(metricKey, el);
+      }
+    };
+    el.onclick = handler;
+    el.onkeydown = e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); }
+    };
+  };
+  wire('ftile_revenue',      'total_revenue');
+  wire('ftile_commission',   'total_commission');
+  wire('ftile_deals',        'deals_count');
+  wire('ftile_reservations', 'reservations_count');
+}
+
+// Aggregate the per-(user, month) breakdown rows by month and render
+// the active metric as a chronological grid of "month → value" cells.
+// If the same metric is already open, close the panel instead.
+function toggleTileBreakdown(metricKey, sourceTile) {
+  const panel = document.getElementById('finTileBreakdown');
+  if (!panel || !reportData) return;
+
+  // Toggle off if user clicks the active tile.
+  if (_activeBreakdownMetric === metricKey) {
+    panel.hidden = true;
+    panel.innerHTML = '';
+    _activeBreakdownMetric = null;
+    document.querySelectorAll('#topTotals .kpi-tile').forEach(el => el.classList.remove('is-active'));
+    return;
+  }
+
+  _activeBreakdownMetric = metricKey;
+  document.querySelectorAll('#topTotals .kpi-tile').forEach(el => el.classList.remove('is-active'));
+  if (sourceTile) sourceTile.classList.add('is-active');
+
+  // Sum across users per month.
+  const byMonth = new Map();
+  for (const r of reportData.breakdown) {
+    const m = r.month;
+    if (!byMonth.has(m)) {
+      byMonth.set(m, { month: m, total_revenue: 0, total_commission: 0, deals_count: 0, reservations_count: 0 });
+    }
+    const agg = byMonth.get(m);
+    agg.total_revenue      += r.total_revenue || 0;
+    agg.total_commission   += r.total_commission || 0;
+    agg.deals_count        += r.deals_count || 0;
+    agg.reservations_count += r.reservations_count || 0;
+  }
+  const months = [...byMonth.values()].sort((a, b) =>
+    (a.month || "").localeCompare(b.month || "")
+  );
+
+  if (!months.length) {
+    panel.hidden = true;
+    panel.innerHTML = '';
+    _activeBreakdownMetric = null;
+    return;
+  }
+
+  const labels = {
+    total_revenue:      t("fin.total_revenue"),
+    total_commission:   t("fin.total_commission"),
+    deals_count:        t("fin.total_deals"),
+    reservations_count: t("fin.total_reservations"),
+  };
+  const isMoney = metricKey === 'total_revenue' || metricKey === 'total_commission';
+
+  // Best/worst highlighting helps the eye spot peaks at a glance.
+  const values = months.map(m => m[metricKey] || 0);
+  const maxVal = Math.max(...values);
+  const minVal = Math.min(...values);
+
+  const cells = months.map(m => {
+    const v = m[metricKey] || 0;
+    const isPeak = values.length > 1 && v === maxVal && maxVal > 0;
+    const isLow  = values.length > 1 && v === minVal && minVal < maxVal;
+    const cls = isPeak ? 'is-peak' : (isLow ? 'is-low' : '');
+    return `
+      <div class="fin-tile-breakdown-cell ${cls}">
+        <div class="fin-tile-breakdown-month">${escapeHTML(fmtMonth(m.month))}</div>
+        <div class="fin-tile-breakdown-value">${isMoney ? fmtCompactMoney(v) : fmtNum(v)}</div>
+      </div>`;
+  }).join('');
+
+  panel.innerHTML = `
+    <div class="fin-tile-breakdown-head">
+      <div>
+        <div class="fin-tile-breakdown-title">${escapeHTML(labels[metricKey] || metricKey)}</div>
+        <div class="fin-tile-breakdown-sub">${escapeHTML(t('fin.activity_breakdown'))} · ${months.length} ${escapeHTML(t('fin.months_label'))}</div>
+      </div>
+      <button class="fin-tile-breakdown-close" type="button" onclick="closeTileBreakdown()" aria-label="${escapeHTML(t('common.close'))}">
+        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+      </button>
+    </div>
+    <div class="fin-tile-breakdown-grid">${cells}</div>
+  `;
+  panel.hidden = false;
+}
+
+function closeTileBreakdown() {
+  const panel = document.getElementById('finTileBreakdown');
+  if (panel) { panel.hidden = true; panel.innerHTML = ''; }
+  _activeBreakdownMetric = null;
+  document.querySelectorAll('#topTotals .kpi-tile').forEach(el => el.classList.remove('is-active'));
+}
+
+function renderTotals(totals) {
+  document.getElementById("totals").innerHTML = `
+    <div class="stat success">
+      <div class="stat-icon"><span class="material-symbols-outlined" aria-hidden="true">trending_up</span></div>
+      <div class="stat-label">${t("fin.commission_yield")}</div>
+      <div class="stat-value sm money">${(totals.total_revenue ? (totals.total_commission/totals.total_revenue*100) : 0).toFixed(2)}%</div>
+      <div class="stat-sub">${t("fin.commission_per_lead")}: ${fmtCompactMoney(totals.avg_commission_per_sales)}</div>
+    </div>
+    <div class="stat accent">
+      <div class="stat-icon"><span class="material-symbols-outlined" aria-hidden="true">diamond</span></div>
+      <div class="stat-label">${t("fin.avg_commission_per_sales")}</div>
+      <div class="stat-value sm money">${fmtCompactMoney(totals.avg_commission_per_sales)}</div>
+      <div class="stat-sub">${t("fin.egp")}</div>
+    </div>
+  `;
+}
+
+function renderCharts(rows) {
+  if (typeof Plotly === 'undefined' || !rows || !rows.length) {
+    ["chartRevenue","chartCommission","chartDealsRes","chartRevenueSplit","chartTreemap"].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (Charts.cancelPending) Charts.cancelPending(id);
+      el.innerHTML = `<div class="empty-state" style="padding:30px">${t("dash.no_data")}</div>`;
+    });
+    return;
+  }
+
+  const sortedByRev = [...rows].sort((a,b) => b.total_revenue - a.total_revenue);
+
+  // Revenue by rep — top 10. Compact labels (14M instead of 14,000,000)
+  // so the bar still has visible width on a phone-sized canvas after the
+  // longest name's row eats its left margin. Single brand colour for all
+  // bars — colour-cycling here would imply categorical meaning that
+  // doesn't exist (every bar is the same metric: revenue per rep).
+  const top10 = sortedByRev.slice(0, 10);
+  Charts.drawHorizontalBar("chartRevenue", {
+    x: top10.map(r => r.total_revenue).reverse(),
+    y: top10.map(r => r.user_name).reverse(),
+    colors: top10.map(() => Charts.COLORS.brand).reverse(),
+    labels: top10.map(r => fmtCompactMoney(r.total_revenue)).reverse(),
+  }, { measureLabels: true });
+
+  // Revenue split: deals vs reservations (totals)
+  const totalDealRev = rows.reduce((a, r) => a + (r.deal_revenue || 0), 0);
+  const totalResRev  = rows.reduce((a, r) => a + (r.reservation_revenue || 0), 0);
+  Charts.drawDonut("chartRevenueSplit", {
+    labels: [t("fin.deal_revenue"), t("fin.reservation_revenue")],
+    values: [totalDealRev, totalResRev],
+    colors: [Charts.COLORS.brand, Charts.COLORS.accent3],
+  }, { centerText: fmtMoney(totalDealRev + totalResRev) });
+
+  // Commission split donut
+  const dealComm = rows.reduce((a, r) => a + (r.deal_commission || 0), 0);
+  const resComm  = rows.reduce((a, r) => a + (r.reservation_commission || 0), 0);
+  Charts.drawDonut("chartCommission", {
+    labels: [t("fin.deal_revenue"), t("fin.reservation_revenue")],
+    values: [dealComm, resComm],
+    colors: [Charts.COLORS.brand2, Charts.COLORS.secondary2],
+  }, { centerText: fmtMoney(dealComm + resComm) });
+
+  // Treemap rendering is delegated so the Top-N selector can re-render
+  // without refetching report data.
+  renderTreemap(rows);
+
+  // Stacked deals + reservations (top 8)
+  const topRows = sortedByRev.slice(0, 8);
+  Charts.drawStackedBar("chartDealsRes",
+    [
+      { name: t("fin.deals_count"),         values: topRows.map(r => r.deals_count),         color: Charts.COLORS.brand },
+      { name: t("fin.reservations_count"),  values: topRows.map(r => r.reservations_count),  color: Charts.COLORS.accent3 },
+    ],
+    topRows.map(r => r.user_name),
+    { showlegend: true, xaxis: { tickangle: -25 } }
+  );
+}
+
+// Treemap — one tile per REP (not per user-month row). Each tile carries
+// the rep's total revenue across the active range plus a meta payload
+// holding their per-month breakdown, so a click can drill straight into
+// the dates that produced that total.
+//
+// Top-N control trims the long tail into a single "Others" tile. Clicking
+// "Others" opens a list of folded reps with their individual totals, so
+// nobody gets hidden — they're just collapsed for legibility.
+const TREEMAP_TOPN_KEY = "ain_fin_treemapTopN";
+
+function _readTreemapTopN() {
+  const sel = document.getElementById("treemapTopN");
+  if (!sel) return 10;
+  const stored = localStorage.getItem(TREEMAP_TOPN_KEY);
+  if (stored && [...sel.options].some(o => o.value === stored)) {
+    sel.value = stored;
+  }
+  return sel.value === "all" ? Infinity : (parseInt(sel.value, 10) || 10);
+}
+
+function onTreemapTopNChange() {
+  const sel = document.getElementById("treemapTopN");
+  if (sel) {
+    try { localStorage.setItem(TREEMAP_TOPN_KEY, sel.value); } catch {}
+  }
+  // Closing the panel avoids a stale drill-down referring to a tile that
+  // may no longer exist after the limit changes.
+  closeTreemapBreakdown();
+  if (reportData) renderTreemap(reportData.breakdown);
+}
+
+// Aggregate per-(user, month) rows into one entry per user. Keeps the
+// monthly rows so the click handler can show per-date detail.
+function _aggregateByUser(rows) {
+  const byUser = new Map();
+  for (const r of rows) {
+    const uid = r.user_id;
+    if (!byUser.has(uid)) {
+      byUser.set(uid, {
+        user_id: uid,
+        user_name: r.user_name,
+        total_revenue: 0,
+        total_commission: 0,
+        deals_count: 0,
+        reservations_count: 0,
+        months: [],
+      });
+    }
+    const a = byUser.get(uid);
+    a.total_revenue    += r.total_revenue || 0;
+    a.total_commission += r.total_commission || 0;
+    a.deals_count      += r.deals_count || 0;
+    a.reservations_count += r.reservations_count || 0;
+    if ((r.total_revenue || 0) > 0) a.months.push(r);
+  }
+  return [...byUser.values()]
+    .filter(u => (u.total_revenue || 0) > 0)
+    .sort((a, b) => b.total_revenue - a.total_revenue);
+}
+
+function renderTreemap(rows) {
+  const el = document.getElementById("chartTreemap");
+  if (!el) return;
+  if (!rows || !rows.length) {
+    if (Charts.cancelPending) Charts.cancelPending("chartTreemap");
+    el.innerHTML = `<div class="empty-state" style="padding:30px">${t("dash.no_data")}</div>`;
+    return;
+  }
+
+  const reps = _aggregateByUser(rows);
+  if (!reps.length) {
+    el.innerHTML = `<div class="empty-state" style="padding:30px">${t("dash.no_data")}</div>`;
+    return;
+  }
+
+  const topN = _readTreemapTopN();
+  const named = reps.slice(0, topN);
+  const tail = reps.slice(topN);
+
+  const labels = named.map(u => u.user_name);
+  const values = named.map(u => u.total_revenue);
+  const colors = named.map((_, i) => Charts.PALETTE[i % Charts.PALETTE.length]);
+  const meta   = named.map(u => ({ type: "rep", rep: u }));
+
+  if (tail.length) {
+    const tailTotal = tail.reduce((s, u) => s + (u.total_revenue || 0), 0);
+    labels.push(`${t("fin.others")} (${tail.length})`);
+    values.push(tailTotal);
+    colors.push(Charts.COLORS.muted);
+    meta.push({ type: "others", members: tail, total: tailTotal });
+  }
+
+  Charts.drawTreemap("chartTreemap", {
+    labels,
+    values,
+    colors,
+    meta,
+    parents: labels.map(() => ""),
+  }, {
+    onTileClick: (tile) => showTreemapBreakdown(tile.meta),
+  });
+}
+
+// Renders the per-rep (or "Others") breakdown panel below the treemap.
+// Visually mirrors #finTileBreakdown so the page reads consistently.
+function showTreemapBreakdown(meta) {
+  const panel = document.getElementById("treemapBreakdown");
+  if (!panel || !meta) return;
+
+  if (meta.type === "rep") {
+    const rep = meta.rep;
+    const months = [...rep.months].sort(
+      (a, b) => (a.month || "").localeCompare(b.month || "")
+    );
+    if (!months.length) {
+      panel.hidden = true;
+      panel.innerHTML = "";
+      return;
+    }
+    const values = months.map(m => m.total_revenue || 0);
+    const maxVal = Math.max(...values);
+    const minVal = Math.min(...values);
+    const cells = months.map(m => {
+      const v = m.total_revenue || 0;
+      const isPeak = months.length > 1 && v === maxVal && maxVal > 0;
+      const isLow  = months.length > 1 && v === minVal && minVal < maxVal;
+      const cls = isPeak ? "is-peak" : (isLow ? "is-low" : "");
+      const dealsRes = `${m.deals_count || 0} ${t("fin.deals_count")} · ${m.reservations_count || 0} ${t("fin.reservations_count")}`;
+      return `
+        <div class="fin-tile-breakdown-cell ${cls}">
+          <div class="fin-tile-breakdown-month">${escapeHTML(fmtMonth(m.month))}</div>
+          <div class="fin-tile-breakdown-value">${fmtCompactMoney(v)}</div>
+          <div class="fin-tile-breakdown-sub-line">${escapeHTML(dealsRes)}</div>
+        </div>`;
+    }).join("");
+    panel.innerHTML = `
+      <div class="fin-tile-breakdown-head">
+        <div>
+          <div class="fin-tile-breakdown-title">${escapeHTML(rep.user_name)}</div>
+          <div class="fin-tile-breakdown-sub">
+            ${escapeHTML(t("fin.total_revenue"))}: ${fmtCompactMoney(rep.total_revenue)}
+            · ${months.length} ${escapeHTML(t("fin.months_label"))}
+          </div>
+        </div>
+        <button class="fin-tile-breakdown-close" type="button" onclick="closeTreemapBreakdown()" aria-label="${escapeHTML(t("common.close"))}">
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        </button>
+      </div>
+      <div class="fin-tile-breakdown-grid">${cells}</div>
+    `;
+  } else if (meta.type === "others") {
+    const members = [...meta.members].sort(
+      (a, b) => b.total_revenue - a.total_revenue
+    );
+    const cells = members.map(u => `
+      <div class="fin-tile-breakdown-cell is-rep-row">
+        <div class="fin-tile-breakdown-month">${escapeHTML(u.user_name)}</div>
+        <div class="fin-tile-breakdown-value">${fmtCompactMoney(u.total_revenue)}</div>
+      </div>`).join("");
+    panel.innerHTML = `
+      <div class="fin-tile-breakdown-head">
+        <div>
+          <div class="fin-tile-breakdown-title">${escapeHTML(t("fin.others"))} (${members.length})</div>
+          <div class="fin-tile-breakdown-sub">
+            ${escapeHTML(t("fin.total_revenue"))}: ${fmtCompactMoney(meta.total)}
+          </div>
+        </div>
+        <button class="fin-tile-breakdown-close" type="button" onclick="closeTreemapBreakdown()" aria-label="${escapeHTML(t("common.close"))}">
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        </button>
+      </div>
+      <div class="fin-tile-breakdown-grid">${cells}</div>
+    `;
+  }
+  panel.hidden = false;
+  panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function closeTreemapBreakdown() {
+  const panel = document.getElementById("treemapBreakdown");
+  if (panel) { panel.hidden = true; panel.innerHTML = ""; }
+}
+
+function renderTrend() {
+  if (!trendData || !trendData.length) {
+    if (Charts.cancelPending) Charts.cancelPending("chartTrend");
+    document.getElementById("chartTrend").innerHTML = `<div class="empty-state" style="padding:30px">${t("dash.no_data")}</div>`;
+    return;
+  }
+  const xLabels = trendData.map(t => fmtMonth(t.month));
+  Charts.drawLineChart("chartTrend", [
+    {
+      name: t("fin.total_revenue"),
+      x: xLabels,
+      y: trendData.map(t => t.revenue),
+      color: Charts.COLORS.brand,
+      fill: true,
+    },
+    {
+      name: t("fin.total_commission"),
+      x: xLabels,
+      y: trendData.map(t => t.commission),
+      color: Charts.COLORS.accent2,
+      fill: true,
+    },
+  ], { showlegend: true });
+}
+
+// Group breakdown rows by user_id, sum across the months they appear in,
+// and render as expandable cards. Summary row shows the user's TOTAL for
+// the active range; clicking expands a per-month detail list with the
+// month label, deal/reservation counts, and the revenue + commission
+// each month contributed. This replaces the previous flat per-(user,month)
+// table where the same rep appeared once per month and totals had to be
+// summed by eye.
+function renderTable(rows) {
+  const tbody = document.getElementById("tbody");
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="table-empty">' + t("dash.no_data") + '</td></tr>';
+    return;
+  }
+
+  // Aggregate by user_id.
+  const byUser = new Map();
+  for (const r of rows) {
+    const uid = r.user_id;
+    if (!byUser.has(uid)) {
+      byUser.set(uid, {
+        user_id: uid,
+        user_name: r.user_name,
+        months: [],
+        deals_count: 0,
+        reservations_count: 0,
+        deal_revenue: 0,
+        reservation_revenue: 0,
+        total_revenue: 0,
+        total_commission: 0,
+      });
+    }
+    const agg = byUser.get(uid);
+    agg.months.push(r);
+    agg.deals_count        += r.deals_count || 0;
+    agg.reservations_count += r.reservations_count || 0;
+    agg.deal_revenue       += r.deal_revenue || 0;
+    agg.reservation_revenue+= r.reservation_revenue || 0;
+    agg.total_revenue      += r.total_revenue || 0;
+    agg.total_commission   += r.total_commission || 0;
+  }
+
+  const sortKey = _financeSort || 'total_revenue';
+  const aggregates = [...byUser.values()]
+    .sort((a, b) => (b[sortKey] || 0) - (a[sortKey] || 0));
+
+  // Each rep gets a summary row + (only if they had any productive
+  // months) a hidden detail row that expands inline. Months with zero
+  // revenue across all metrics are filtered out — showing a row of
+  // zeros for "Mar 2026" when the rep just didn't sell anything that
+  // month would just clutter the panel. If a rep had ZERO activity in
+  // every month of the range, we drop the expand button entirely so
+  // the summary row stays visible (the user still sees the underperformer)
+  // but isn't promised a detail panel that would only contain zeros.
+  tbody.innerHTML = aggregates.map((u, i) => {
+    const rankCls = i === 0 ? "r1" : i === 1 ? "r2" : i === 2 ? "r3" : "";
+
+    // Productive months only. We treat a month as "productive" if the
+    // total revenue is positive; this captures both deal revenue and
+    // reservation revenue without having to OR them at the call site.
+    const productive = u.months
+      .filter(m => (m.total_revenue || 0) > 0)
+      .sort((a, b) => (a.month || "").localeCompare(b.month || ""));
+    const hasActivity = productive.length > 0;
+
+    const detailRows = productive.map(m => `
+      <tr class="fin-detail-month">
+        <td>${escapeHTML(fmtMonth(m.month))}</td>
+        <td>${m.deals_count || 0}</td>
+        <td>${m.reservations_count || 0}</td>
+        <td class="money">${fmtMoney(m.deal_revenue)}</td>
+        <td class="money">${fmtMoney(m.reservation_revenue)}</td>
+        <td class="money">${fmtMoney(m.total_revenue)}</td>
+        <td class="money">${fmtMoney(m.total_commission)}</td>
+      </tr>`).join("");
+
+    let subText;
+    if (!hasActivity) {
+      subText = t('fin.no_activity_in_range');
+    } else if (productive.length === 1) {
+      subText = fmtMonth(productive[0].month);
+    } else {
+      subText = `${productive.length} ${t("fin.months_label")} · ${fmtMonth(productive[0].month)} → ${fmtMonth(productive[productive.length-1].month)}`;
+    }
+
+    // Spacer keeps the avatar/text aligned with rows that DO have an
+    // expand button. Rendering the button conditionally without it
+    // shifts non-expandable rows ~38px to the left.
+    const leadingControl = hasActivity
+      ? `<button class="fin-expand-btn" type="button" aria-expanded="false" aria-label="${escapeHTML(t('common.details'))}">
+           <span class="material-symbols-outlined fin-expand-chev" aria-hidden="true">expand_more</span>
+         </button>`
+      : `<span class="fin-expand-spacer" aria-hidden="true"></span>`;
+
+    const summaryRow = `<tr class="fin-summary${hasActivity ? '' : ' is-empty'}" data-user="${u.user_id}">
+      <td><span class="rank ${rankCls}">${i + 1}</span></td>
+      <td style="font-weight:600">
+        <div style="display:flex;align-items:center;gap:10px">
+          ${leadingControl}
+          <div class="avatar" style="width:30px;height:30px;font-size:12px">${escapeHTML((u.user_name||'?')[0])}</div>
+          <div style="display:flex;flex-direction:column;line-height:1.25">
+            <span>${escapeHTML(u.user_name)}</span>
+            <span class="text-muted" style="font-size:11px;font-weight:500">${escapeHTML(subText)}</span>
+          </div>
+        </div>
+      </td>
+      <td>${u.deals_count}</td>
+      <td>${u.reservations_count}</td>
+      <td class="money">${fmtMoney(u.deal_revenue)}</td>
+      <td class="money">${fmtMoney(u.reservation_revenue)}</td>
+      <td class="money fin-key-num">${fmtMoney(u.total_revenue)}</td>
+      <td class="money fin-key-num">${fmtMoney(u.total_commission)}</td>
+    </tr>`;
+
+    // Skip emitting the detail row entirely when there's nothing to put
+    // in it — saves DOM nodes and avoids an empty <tr> in the table.
+    const detailRow = hasActivity ? `<tr class="fin-detail-row" hidden>
+      <td colspan="8">
+        <div class="fin-detail-wrap">
+          <div class="fin-detail-title">${escapeHTML(t('fin.activity_breakdown'))}</div>
+          <table class="fin-detail-table">
+            <thead><tr>
+              <th>${escapeHTML(t('common.month'))}</th>
+              <th>${escapeHTML(t('fin.deals_count'))}</th>
+              <th>${escapeHTML(t('fin.reservations_count'))}</th>
+              <th>${escapeHTML(t('fin.deal_revenue'))}</th>
+              <th>${escapeHTML(t('fin.reservation_revenue'))}</th>
+              <th>${escapeHTML(t('fin.total_revenue'))}</th>
+              <th>${escapeHTML(t('fin.total_commission'))}</th>
+            </tr></thead>
+            <tbody>${detailRows}</tbody>
+          </table>
+        </div>
+      </td>
+    </tr>` : '';
+
+    return summaryRow + detailRow;
+  }).join("");
+
+  // Wire expand toggles. Only rows with an expand button (i.e. ones
+  // that have an immediately-following .fin-detail-row sibling) get
+  // a click handler; "is-empty" rows do nothing on click.
+  tbody.querySelectorAll('.fin-summary').forEach(row => {
+    if (row.classList.contains('is-empty')) return;
+    const detail = row.nextElementSibling;
+    if (!detail || !detail.classList.contains('fin-detail-row')) return;
+    const btn = row.querySelector('.fin-expand-btn');
+    const toggle = (e) => {
+      if (e.target.closest('a')) return;
+      const open = detail.hasAttribute('hidden');
+      if (open) detail.removeAttribute('hidden');
+      else      detail.setAttribute('hidden', '');
+      row.classList.toggle('is-expanded', open);
+      if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+    row.addEventListener('click', toggle);
+  });
+}
+
+function escapeHTML(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
+    {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]
+  ));
+}
+
+function exportCSV() {
+  if (!reportData) return;
+  const rows = reportData.breakdown;
+  const header = [t("admin.user"), t("fin.deals_count"), t("fin.reservations_count"),
+                  t("fin.deal_revenue"), t("fin.reservation_revenue"),
+                  t("fin.total_revenue"), t("fin.total_commission")];
+  const lines = [header.join(",")];
+  rows.forEach(r => {
+    lines.push([r.user_name, r.deals_count, r.reservations_count,
+      r.deal_revenue, r.reservation_revenue, r.total_revenue, r.total_commission].join(","));
+  });
+  const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `finance_${reportData.month || "all"}.csv`;
+  a.click();
+}
+
+function onLangChange() {
+  if (_drCtrl) {
+    _drCtrl.refreshLabels();
+    _updateRangeWarning(_drCtrl.getRange());
+  }
+  render();
+}
+
+// Theme flip — render() repaints every chart against the new palette,
+// so we reuse it. No API round-trip needed.
+function onThemeChange() { render(); }
+
+// Reactive contextual warning — shows when the selected range is sub-month.
+// Hidden when the range covers full calendar months (single or multi).
+function _updateRangeWarning(range) {
+  const host = document.getElementById("rangeWarning");
+  const txt = document.getElementById("rangeWarningText");
+  if (!host || !txt) return;
+  if (range && range.isSubMonth) {
+    txt.innerHTML = t("finance.range_warning_submonth");
+    host.hidden = false;
+  } else {
+    host.hidden = true;
+  }
+}
+
+// Finance now accepts ALL presets; the warning banner above the page content
+// flags sub-month selections so users don't misread monthly totals as daily.
+_drCtrl = DateRange.mount(document.getElementById("dateRangeHost"), {
+  defaultPreset: "last_30",
+  mode: "full",
+  onChange: (range) => { _updateRangeWarning(range); loadAll(); },
+});
+</script>
+{% endblock %}

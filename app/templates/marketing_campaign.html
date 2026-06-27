@@ -1,0 +1,1635 @@
+{% extends "base.html" %}
+{% block title %}{{ campaign.name }} · CRM{% endblock %}
+
+{% block head %}
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<!-- Hero ribbon — same primitive used across the system. -->
+<section class="hero-ribbon">
+  <div>
+    <h1 class="page-title">{{ campaign.name }}</h1>
+    <p class="page-subtitle">
+      <span data-i18n="crm.overview.title"></span>
+      <span class="hero-dot" aria-hidden="true">·</span>
+      <span id="lastUpdatedLine" class="text-muted"></span>
+    </p>
+  </div>
+  <div class="hero-actions">
+    <a href="/marketing" class="btn btn-ghost">
+      <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+      <span data-i18n="common.back"></span>
+    </a>
+  </div>
+</section>
+
+<nav class="crm-tabs" role="tablist" aria-label="campaign sections">
+  <button class="crm-tab is-active" role="tab" aria-selected="true" data-tab="overview">
+    <span class="material-symbols-outlined crm-tab-icon" aria-hidden="true">dashboard</span>
+    <span data-i18n="crm.tabs.overview"></span>
+  </button>
+  <button class="crm-tab" role="tab" aria-selected="false" data-tab="sales">
+    <span class="material-symbols-outlined crm-tab-icon" aria-hidden="true">groups</span>
+    <span data-i18n="crm.tabs.sales"></span>
+  </button>
+  <button class="crm-tab" role="tab" aria-selected="false" data-tab="leads">
+    <span class="material-symbols-outlined crm-tab-icon" aria-hidden="true">contacts</span>
+    <span data-i18n="crm.tabs.leads"></span>
+  </button>
+  <button class="crm-tab" role="tab" aria-selected="false" data-tab="intervention">
+    <span class="material-symbols-outlined crm-tab-icon" aria-hidden="true">flag</span>
+    <span data-i18n="crm.tabs.intervention"></span>
+  </button>
+  <button class="crm-tab" role="tab" aria-selected="false" data-tab="daily">
+    <span class="material-symbols-outlined crm-tab-icon" aria-hidden="true">calendar_month</span>
+    <span data-i18n="crm.tabs.daily"></span>
+  </button>
+  <button class="crm-tab" role="tab" aria-selected="false" data-tab="marketing">
+    <span class="material-symbols-outlined crm-tab-icon" aria-hidden="true">analytics</span>
+    <span data-i18n="crm.tabs.marketing"></span>
+  </button>
+</nav>
+
+<!-- ── Overview tab ─────────────────────────────────────────────────── -->
+<section class="crm-tab-panel" data-panel="overview" role="tabpanel">
+  <!-- 4 KPI tiles. Layout uses .stats-grid + .kpi-tile per design system. -->
+  <div class="stats-grid" style="margin-bottom:24px">
+    <div class="kpi-tile tile-brand">
+      <span class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">groups</span></span>
+      <span class="kpi-tile-label" data-i18n="crm.overview.total_leads"></span>
+      <span class="kpi-tile-value" id="kpiTotalLeads">—</span>
+    </div>
+    <div class="kpi-tile tile-warm">
+      <span class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">warning</span></span>
+      <span class="kpi-tile-label" data-i18n="crm.overview.open_intervention"></span>
+      <span class="kpi-tile-value" id="kpiOpenIntervention">—</span>
+    </div>
+    <div class="kpi-tile tile-coral">
+      <span class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">priority_high</span></span>
+      <span class="kpi-tile-label" data-i18n="crm.overview.high_priority"></span>
+      <span class="kpi-tile-value" id="kpiHighPriority">—</span>
+    </div>
+    <div class="kpi-tile tile-accent">
+      <span class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">cloud_upload</span></span>
+      <span class="kpi-tile-label" data-i18n="crm.overview.last_upload"></span>
+      <span class="kpi-tile-value" id="kpiLastUpload" style="font-size:18px">—</span>
+    </div>
+  </div>
+
+  <div class="bento" style="gap:24px">
+    <div class="chart-card span-7">
+      <div class="chart-card-header">
+        <h3 class="chart-card-title" data-i18n="crm.overview.stage_breakdown"></h3>
+      </div>
+      <div id="stageDonut" class="chart-host" style="min-height:320px"></div>
+      <div id="stageEmpty" class="text-muted text-center" style="display:none;padding:60px 20px"
+           data-i18n="crm.overview.no_data"></div>
+    </div>
+
+    <div class="glass-card span-5 crm-intervention-panel">
+      <div class="crm-panel-header">
+        <span class="material-symbols-outlined" aria-hidden="true" style="color:var(--danger);font-size:20px">flag</span>
+        <h3 class="chart-card-title" style="margin:0" data-i18n="crm.overview.intervention_summary"></h3>
+        <a href="#" class="text-link" id="interventionViewAll" style="margin-inline-start:auto"
+           data-i18n="crm.overview.view_all"></a>
+      </div>
+      <ul class="intervention-list" id="interventionList">
+        <li class="intervention-empty text-muted" data-i18n="crm.overview.intervention_none"></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ── Sales Performance tab ─────────────────────────────────────────── -->
+<section class="crm-tab-panel" data-panel="sales" role="tabpanel" hidden>
+
+  <div id="salesUnmatchedWarn" class="crm-warn-banner" hidden>
+    <span class="material-symbols-outlined" aria-hidden="true">warning</span>
+    <div class="sales-unmatched-body">
+      <div class="sales-unmatched-title" id="salesUnmatchedTitle"></div>
+      <ul class="sales-unmatched-list" id="salesUnmatchedList"></ul>
+    </div>
+  </div>
+
+  <div class="bento crm-bento" id="salesChartsBlock" hidden>
+    <div class="chart-card span-12">
+      <div class="chart-card-header">
+        <span class="material-symbols-outlined crm-chart-icon" aria-hidden="true">bar_chart</span>
+        <h3 class="chart-card-title" data-i18n="crm.sales.totals_by_rep"></h3>
+      </div>
+      <div id="salesTotalsChart" class="chart-host" style="min-height:300px"></div>
+    </div>
+    <div class="chart-card span-6">
+      <div class="chart-card-header">
+        <span class="material-symbols-outlined crm-chart-icon fresh-icon" aria-hidden="true">fiber_new</span>
+        <h3 class="chart-card-title" data-i18n="crm.sales.fresh_outcomes"></h3>
+      </div>
+      <div id="salesFreshChart" class="chart-host" style="min-height:300px"></div>
+    </div>
+    <div class="chart-card span-6">
+      <div class="chart-card-header">
+        <span class="material-symbols-outlined crm-chart-icon rotation-icon" aria-hidden="true">sync</span>
+        <h3 class="chart-card-title" data-i18n="crm.sales.rotation_outcomes"></h3>
+      </div>
+      <div id="salesRotationChart" class="chart-host" style="min-height:300px"></div>
+    </div>
+  </div>
+
+  <div class="glass-card table-wrap crm-table-card" id="salesTableWrap" hidden>
+    <table id="salesRepTable">
+      <thead>
+        <tr>
+          <th data-i18n="crm.sales.col.rep"></th>
+          <th style="text-align:end" data-i18n="crm.sales.fresh_leads"></th>
+          <th data-i18n="crm.sales.fresh_outcomes"></th>
+          <th style="text-align:end" data-i18n="crm.sales.rotation_leads"></th>
+          <th data-i18n="crm.sales.rotation_outcomes"></th>
+        </tr>
+      </thead>
+      <tbody id="salesRepRows"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ── Leads tab (P3) ───────────────────────────────────────────────── -->
+<section class="crm-tab-panel" data-panel="leads" role="tabpanel" hidden>
+  <!-- Filter bar -->
+  <div class="glass-card" style="padding:14px 18px;margin-bottom:18px">
+    <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap">
+      <div class="field" style="flex:1;min-width:200px;margin:0">
+        <label data-i18n="crm.leads.search"></label>
+        <input type="search" id="leadsSearch" placeholder=""
+               data-i18n-placeholder="crm.leads.search">
+      </div>
+      <div class="field" style="min-width:160px;margin:0">
+        <label data-i18n="crm.leads.filter.stage"></label>
+        <select id="leadsStageFilter">
+          <option value="all" data-i18n="common.all"></option>
+          <option value="NO_ANSWER"    data-i18n="crm.stages.NO_ANSWER"></option>
+          <option value="FOLLOWING"    data-i18n="crm.stages.FOLLOWING"></option>
+          <option value="MEETING"      data-i18n="crm.stages.MEETING"></option>
+          <option value="CANCELLATION" data-i18n="crm.stages.CANCELLATION"></option>
+          <option value="INTERESTED"   data-i18n="crm.stages.INTERESTED"></option>
+          <option value="REQUEST"      data-i18n="crm.stages.REQUEST"></option>
+        </select>
+      </div>
+      <div class="field" style="min-width:160px;margin:0">
+        <label data-i18n="crm.leads.filter.rep"></label>
+        <select id="leadsRepFilter">
+          <option value="all" data-i18n="common.all"></option>
+        </select>
+      </div>
+      <div class="field" style="min-width:160px;margin:0">
+        <label data-i18n="crm.leads.filter.intervention"></label>
+        <select id="leadsInterventionFilter">
+          <option value="all"   data-i18n="common.all"></option>
+          <option value="true"  data-i18n="common.yes"></option>
+          <option value="false" data-i18n="common.no"></option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="glass-card table-wrap" style="padding:0;overflow-x:auto">
+    <table id="leadsTable">
+      <thead>
+        <tr>
+          <th data-i18n="crm.leads.col.client"></th>
+          <th data-i18n="crm.leads.col.mobile"></th>
+          <th data-i18n="crm.leads.col.stage"></th>
+          <th data-i18n="crm.leads.col.rep"></th>
+          <th style="text-align:end" data-i18n="crm.leads.col.events"></th>
+          <th data-i18n="crm.leads.col.last_event"></th>
+          <th data-i18n="crm.intervention.title"></th>
+          <th style="text-align:end" data-i18n="crm.leads.col.actions"></th>
+        </tr>
+      </thead>
+      <tbody id="leadsRows">
+        <tr><td colspan="8" class="text-muted" style="padding:18px;text-align:center"
+                data-i18n="common.loading"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:12px;flex-wrap:wrap">
+    <span class="text-muted" id="leadsTotalLabel" style="font-size:13px"></span>
+    <button id="leadsLoadMore" class="btn btn-ghost" hidden onclick="loadLeads(true)">
+      <span data-i18n="crm.leads.load_more"></span>
+    </button>
+  </div>
+</section>
+
+<!-- ── Manager Intervention tab (P3) ─────────────────────────────────── -->
+<section class="crm-tab-panel" data-panel="intervention" role="tabpanel" hidden>
+  <div class="glass-card" style="padding:14px 18px;margin-bottom:18px">
+    <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap">
+      <div class="field" style="min-width:160px;margin:0">
+        <label data-i18n="crm.intervention.filter.status"></label>
+        <select id="invTabStatus">
+          <option value="OPEN" data-i18n="crm.intervention.status.open"></option>
+          <option value="REVIEWED" data-i18n="crm.intervention.status.reviewed"></option>
+          <option value="CLOSED" data-i18n="crm.intervention.status.closed"></option>
+          <option value="all" data-i18n="common.all"></option>
+        </select>
+      </div>
+      <div class="field" style="min-width:160px;margin:0">
+        <label data-i18n="crm.intervention.filter.priority"></label>
+        <select id="invTabPriority">
+          <option value="all" data-i18n="common.all"></option>
+          <option value="HIGH" data-i18n="crm.intervention.priority.high"></option>
+          <option value="MEDIUM" data-i18n="crm.intervention.priority.medium"></option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div id="invTabList" class="iv-grid"></div>
+  <div id="invTabEmpty" class="glass-card" style="padding:48px;text-align:center" hidden>
+    <span class="material-symbols-outlined" aria-hidden="true" style="font-size:48px;color:var(--text-dim)">inbox</span>
+    <h3 style="margin-top:12px" data-i18n="crm.intervention.empty"></h3>
+  </div>
+</section>
+
+<!-- ── Daily Activity tab ────────────────────────────────────────────── -->
+<section class="crm-tab-panel" data-panel="daily" role="tabpanel" hidden>
+
+  <div class="crm-filter-bar glass-card">
+    <div class="crm-filter-row">
+      <div class="field" style="margin:0">
+        <label data-i18n="crm.daily.from"></label>
+        <input type="date" id="dailyFrom">
+      </div>
+      <div class="field" style="margin:0">
+        <label data-i18n="crm.daily.to"></label>
+        <input type="date" id="dailyTo">
+      </div>
+      <button class="btn btn-primary" onclick="loadDaily()">
+        <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">refresh</span>
+        <span data-i18n="common.refresh"></span>
+      </button>
+    </div>
+  </div>
+
+  <div class="stats-grid" style="margin-bottom:24px">
+    <div class="kpi-tile tile-brand">
+      <span class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">phone_in_talk</span></span>
+      <span class="kpi-tile-label" data-i18n="crm.daily.total_attempts"></span>
+      <span class="kpi-tile-value" id="dailyTotal">—</span>
+    </div>
+    <div class="kpi-tile tile-accent">
+      <span class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">check_circle</span></span>
+      <span class="kpi-tile-label" data-i18n="crm.daily.answered"></span>
+      <span class="kpi-tile-value" id="dailyAnswered">—</span>
+    </div>
+    <div class="kpi-tile tile-warm">
+      <span class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">trending_up</span></span>
+      <span class="kpi-tile-label" data-i18n="crm.daily.response_rate"></span>
+      <span class="kpi-tile-value" id="dailyRate">—</span>
+    </div>
+  </div>
+
+  <div class="bento crm-bento" id="dailyChartsBlock" hidden>
+    <div class="chart-card span-12">
+      <div class="chart-card-header">
+        <span class="material-symbols-outlined crm-chart-icon" aria-hidden="true">show_chart</span>
+        <h3 class="chart-card-title" data-i18n="crm.daily.attempts_vs_answered"></h3>
+      </div>
+      <div id="dailyAttemptsChart" class="chart-host" style="min-height:300px"></div>
+    </div>
+    <div class="chart-card span-7">
+      <div class="chart-card-header">
+        <span class="material-symbols-outlined crm-chart-icon" aria-hidden="true">stacked_bar_chart</span>
+        <h3 class="chart-card-title" data-i18n="crm.daily.stage_breakdown_daily"></h3>
+      </div>
+      <div id="dailyStageChart" class="chart-host" style="min-height:280px"></div>
+    </div>
+    <div class="chart-card span-5">
+      <div class="chart-card-header">
+        <span class="material-symbols-outlined crm-chart-icon" aria-hidden="true">percent</span>
+        <h3 class="chart-card-title" data-i18n="crm.daily.response_rate_over_time"></h3>
+      </div>
+      <div id="dailyRateChart" class="chart-host" style="min-height:280px"></div>
+    </div>
+  </div>
+
+  <div class="glass-card table-wrap crm-table-card" id="dailyTableWrap" hidden>
+    <table id="dailyTable">
+      <thead>
+        <tr>
+          <th data-i18n="crm.daily.col.date"></th>
+          <th style="text-align:end" data-i18n="crm.daily.total_attempts"></th>
+          <th style="text-align:end" data-i18n="crm.stages.NO_ANSWER"></th>
+          <th style="text-align:end" data-i18n="crm.stages.FOLLOWING"></th>
+          <th style="text-align:end" data-i18n="crm.stages.MEETING"></th>
+          <th style="text-align:end" data-i18n="crm.stages.CANCELLATION"></th>
+          <th style="text-align:end" data-i18n="crm.stages.INTERESTED"></th>
+          <th style="text-align:end" data-i18n="crm.daily.answered"></th>
+          <th style="text-align:end" data-i18n="crm.daily.response_rate"></th>
+        </tr>
+      </thead>
+      <tbody id="dailyRows"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ── Marketing Report tab ──────────────────────────────────────────── -->
+<section class="crm-tab-panel" data-panel="marketing" role="tabpanel" hidden>
+
+  <div id="mktrBody" hidden>
+    <div class="stats-grid" style="margin-bottom:24px">
+      <div class="kpi-tile tile-brand">
+        <span class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">groups</span></span>
+        <span class="kpi-tile-label" data-i18n="crm.marketing.unique_leads"></span>
+        <span class="kpi-tile-value" id="mktrTotal">—</span>
+      </div>
+      <div class="kpi-tile tile-accent">
+        <span class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">trending_up</span></span>
+        <span class="kpi-tile-label" data-i18n="crm.daily.response_rate"></span>
+        <span class="kpi-tile-value" id="mktrResponse">—</span>
+      </div>
+      <div class="kpi-tile tile-warm">
+        <span class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">trending_down</span></span>
+        <span class="kpi-tile-label" data-i18n="crm.marketing.no_answer_rate"></span>
+        <span class="kpi-tile-value" id="mktrNoAnswer">—</span>
+      </div>
+    </div>
+
+    <div class="bento crm-bento">
+      <div class="chart-card span-6">
+        <div class="chart-card-header">
+          <span class="material-symbols-outlined crm-chart-icon" aria-hidden="true">donut_large</span>
+          <h3 class="chart-card-title" data-i18n="crm.marketing.stage_breakdown_unique"></h3>
+        </div>
+        <div id="mktrDonut" class="chart-host" style="min-height:300px"></div>
+      </div>
+      <div class="glass-card span-6" style="padding:20px 22px;display:flex;flex-direction:column;gap:0">
+        <div class="crm-panel-header" style="margin-bottom:14px">
+          <span class="material-symbols-outlined" aria-hidden="true" style="color:var(--brand);font-size:20px">lightbulb</span>
+          <h3 class="chart-card-title" style="margin:0" data-i18n="crm.marketing.insights"></h3>
+        </div>
+        <ul id="mktrInsights" class="mktr-insights"></ul>
+      </div>
+    </div>
+
+    <div class="glass-card crm-rates-card">
+      <div class="crm-panel-header" style="margin-bottom:18px">
+        <span class="material-symbols-outlined" aria-hidden="true" style="color:var(--brand);font-size:20px">percent</span>
+        <h3 class="chart-card-title" style="margin:0" data-i18n="crm.marketing.rates"></h3>
+      </div>
+      <div class="mktr-rate-grid">
+        <div class="mktr-rate">
+          <div class="mktr-rate-label"><span data-i18n="crm.daily.response_rate"></span></div>
+          <div class="mktr-bar"><div class="mktr-bar-fill is-positive" id="mktrBarResponse" style="width:0%"></div></div>
+          <div class="mktr-rate-value" id="mktrBarResponseLbl">0%</div>
+        </div>
+        <div class="mktr-rate">
+          <div class="mktr-rate-label"><span data-i18n="crm.marketing.no_answer_rate"></span></div>
+          <div class="mktr-bar"><div class="mktr-bar-fill is-warn" id="mktrBarNoAnswer" style="width:0%"></div></div>
+          <div class="mktr-rate-value" id="mktrBarNoAnswerLbl">0%</div>
+        </div>
+        <div class="mktr-rate">
+          <div class="mktr-rate-label"><span data-i18n="crm.marketing.intervention_rate"></span></div>
+          <div class="mktr-bar"><div class="mktr-bar-fill is-danger" id="mktrBarIntervention" style="width:0%"></div></div>
+          <div class="mktr-rate-value" id="mktrBarInterventionLbl">0%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Floating "Upload CRM Report" FAB — sticky bottom-end. -->
+<button class="crm-fab" id="crmFab" type="button"
+        data-i18n-title="crm.upload.title" data-i18n-aria-label="crm.upload.title">
+  <span class="material-symbols-outlined" aria-hidden="true">cloud_upload</span>
+  <span data-i18n="crm.upload.title"></span>
+</button>
+
+<!-- ── Upload modal ─────────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="uploadModal" role="dialog" aria-modal="true" aria-labelledby="uploadModalTitle">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="uploadModalTitle" data-i18n="crm.upload.title"></div>
+      <button class="modal-close" onclick="closeModal('uploadModal')" data-i18n-aria-label="common.close">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- Idle state: file picker. -->
+      <div id="uploadStateIdle">
+        <p class="text-muted" style="margin-bottom:14px" data-i18n="crm.upload.choose_file"></p>
+        <input type="file" id="uploadFile" accept=".xlsx"
+               style="width:100%;padding:10px;border:1px dashed var(--border);border-radius:var(--radius-sm)">
+        <p class="text-dim" style="font-size:12px;margin-top:8px" data-i18n="crm.upload.cap_hint"></p>
+      </div>
+
+      <!-- Processing state: spinner + status text. -->
+      <div id="uploadStateRunning" hidden>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="loading"></span>
+          <span data-i18n="crm.upload.processing"></span>
+        </div>
+        <p class="text-muted" style="margin-top:8px;font-size:13px" id="uploadProgressLabel"></p>
+      </div>
+
+      <!-- Result state: summary + warnings. -->
+      <div id="uploadStateResult" hidden>
+        <div class="upload-result-banner" id="uploadResultBanner"></div>
+        <dl class="upload-summary-grid" id="uploadSummary"></dl>
+        <div id="uploadWarnings"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="uploadCancelBtn" class="btn btn-ghost" onclick="closeModal('uploadModal')"
+              data-i18n="common.cancel"></button>
+      <button id="uploadGoBtn" class="btn btn-primary" onclick="startUpload()"
+              data-i18n="crm.upload.button"></button>
+      <button id="uploadDoneBtn" class="btn btn-primary" onclick="finishUpload()" hidden
+              data-i18n="common.ok"></button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}?v=flat64"></script>
+<script>
+const CAMPAIGN_ID = {{ campaign.id }};
+const STAGE_TOKENS = ["NO_ANSWER", "FOLLOWING", "MEETING", "CANCELLATION", "INTERESTED", "REQUEST"];
+let overview = null;
+let pollTimer = null;
+let pollTries = 0;
+
+// ─── Tabs ─────────────────────────────────────────────────────────────
+// Lazy-load each non-Overview panel the first time it's opened. The
+// Overview is the landing view so it loads eagerly; everything else stays
+// idle until clicked, so a fresh page paint only fires one API call.
+let salesLoaded = false;
+let leadsLoaded = false;
+let invTabLoaded = false;
+let dailyLoaded = false;
+let mktrLoaded = false;
+document.querySelectorAll(".crm-tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const target = btn.getAttribute("data-tab");
+    document.querySelectorAll(".crm-tab").forEach(b => {
+      const active = b === btn;
+      b.classList.toggle("is-active", active);
+      b.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    document.querySelectorAll(".crm-tab-panel").forEach(p => {
+      p.hidden = p.getAttribute("data-panel") !== target;
+    });
+    if (target === "sales" && !salesLoaded) {
+      salesLoaded = true;
+      loadSalesKpis();
+    } else if (target === "sales" && salesData) {
+      // Already loaded — re-draw charts so they pick up any post-language
+      // toggle text changes or layout reflow after the panel un-hid.
+      renderSalesKpis();
+    } else if (target === "leads" && !leadsLoaded) {
+      leadsLoaded = true;
+      loadLeadsRepFilter();
+      loadLeads(false);
+    } else if (target === "intervention" && !invTabLoaded) {
+      invTabLoaded = true;
+      loadInterventionTab();
+    } else if (target === "daily" && !dailyLoaded) {
+      dailyLoaded = true;
+      seedDailyDates();
+      loadDaily();
+    } else if (target === "daily" && dailyData) {
+      renderDaily();  // re-draw on language flip
+    } else if (target === "marketing" && !mktrLoaded) {
+      mktrLoaded = true;
+      loadMarketingReport();
+    } else if (target === "marketing" && mktrData) {
+      renderMarketingReport();
+    }
+  });
+});
+
+// ─── Load + render overview ──────────────────────────────────────────
+async function loadOverview() {
+  try {
+    overview = await api(`/api/crm/campaigns/${CAMPAIGN_ID}/overview`);
+    renderOverview();
+  } catch (e) {
+    toastError(e);
+  }
+  // Top-5 intervention sample comes from the dedicated endpoint so the
+  // donut data doesn't bloat with full text fields.
+  try {
+    const list = await api(`/api/crm/campaigns/${CAMPAIGN_ID}/intervention?status=OPEN&priority=HIGH`);
+    renderInterventionTop(list);
+  } catch (e) {
+    // Soft-fail — the rest of the page is still useful without this card.
+    console.warn("intervention sample failed:", e);
+  }
+}
+
+function renderOverview() {
+  if (!overview) return;
+  // KPI tiles
+  setText("kpiTotalLeads", fmtNum(overview.total_leads));
+  setText("kpiOpenIntervention", fmtNum(overview.manager_intervention_count));
+  setText("kpiHighPriority", fmtNum((overview.intervention_breakdown || {}).HIGH || 0));
+  setText("kpiLastUpload", overview.last_upload_at
+    ? fmtDateShort(overview.last_upload_at)
+    : t("common.never") || "—");
+
+  // Last-updated subtitle line (under hero)
+  const summary = overview.last_upload_summary;
+  const lastLine = document.getElementById("lastUpdatedLine");
+  if (lastLine) {
+    if (summary && summary.uploaded_at) {
+      const by = summary.uploaded_by_name ? ` · ${summary.uploaded_by_name}` : "";
+      lastLine.textContent = `${t("crm.overview.last_upload")}: ${fmtDateTimeShort(summary.uploaded_at)}${by}`;
+    } else {
+      lastLine.textContent = t("crm.overview.no_uploads_yet");
+    }
+  }
+
+  // Donut
+  renderStageDonut(overview.stage_counts || {});
+}
+
+function renderStageDonut(stageCounts) {
+  const host = document.getElementById("stageDonut");
+  const empty = document.getElementById("stageEmpty");
+  const labels = [];
+  const values = [];
+  STAGE_TOKENS.forEach(tok => {
+    const n = stageCounts[tok] || 0;
+    if (n > 0) {
+      labels.push(t("crm.stages." + tok));
+      values.push(n);
+    }
+  });
+  if (!values.length) {
+    host.style.display = "none";
+    empty.style.display = "block";
+    return;
+  }
+  host.style.display = "block";
+  empty.style.display = "none";
+  // Charts.drawDonut funnels through _waitForPlotly so calling it before
+  // Plotly's CDN finishes is safe. Signature: (containerId, {labels, values}).
+  Charts.drawDonut("stageDonut", { labels, values });
+}
+
+function renderInterventionTop(list) {
+  const el = document.getElementById("interventionList");
+  el.innerHTML = "";
+  if (!list || !list.length) {
+    const li = document.createElement("li");
+    li.className = "intervention-empty text-muted";
+    li.textContent = t("crm.overview.intervention_none");
+    el.appendChild(li);
+    return;
+  }
+  list.slice(0, 5).forEach(item => {
+    const li = document.createElement("li");
+    li.className = "intervention-item";
+    const priorityClass = item.priority === "HIGH" ? "is-high" : "is-medium";
+    li.innerHTML = `
+      <span class="intervention-priority ${priorityClass}">${escapeHtml(item.priority)}</span>
+      <div class="intervention-body">
+        <div class="intervention-name">${escapeHtml(item.client_name || item.mobile || "")}</div>
+        <div class="intervention-meta text-muted">
+          ${escapeHtml(item.mobile || "")}
+          ${item.last_comment ? " · " + escapeHtml(item.last_comment) : ""}
+        </div>
+      </div>
+    `;
+    el.appendChild(li);
+  });
+}
+
+// ─── Upload + polling ────────────────────────────────────────────────
+document.getElementById("crmFab").addEventListener("click", () => {
+  resetUploadModal();
+  openModal("uploadModal");
+});
+
+function resetUploadModal() {
+  document.getElementById("uploadFile").value = "";
+  document.getElementById("uploadStateIdle").hidden = false;
+  document.getElementById("uploadStateRunning").hidden = true;
+  document.getElementById("uploadStateResult").hidden = true;
+  document.getElementById("uploadGoBtn").hidden = false;
+  document.getElementById("uploadGoBtn").disabled = false;
+  document.getElementById("uploadCancelBtn").hidden = false;
+  document.getElementById("uploadDoneBtn").hidden = true;
+  document.getElementById("uploadResultBanner").className = "upload-result-banner";
+  document.getElementById("uploadResultBanner").textContent = "";
+  document.getElementById("uploadSummary").innerHTML = "";
+  document.getElementById("uploadWarnings").innerHTML = "";
+}
+
+async function startUpload() {
+  const fileInput = document.getElementById("uploadFile");
+  const file = fileInput.files && fileInput.files[0];
+  if (!file) {
+    toast(t("errors.required_fields_missing"), "error");
+    return;
+  }
+  // Client-side .xlsx hint. The server re-validates.
+  if (!file.name.toLowerCase().endsWith(".xlsx")) {
+    toast(t("crm.upload.bad_type"), "error");
+    return;
+  }
+
+  document.getElementById("uploadStateIdle").hidden = true;
+  document.getElementById("uploadStateRunning").hidden = false;
+  document.getElementById("uploadGoBtn").disabled = true;
+
+  const fd = new FormData();
+  fd.append("file", file);
+
+  let uploadId = null;
+  try {
+    // FormData uploads need to bypass the JSON wrapper in `api()`. Hit fetch
+    // directly but keep the CSRF flow: api() seeds _CSRF on first call via
+    // /me; we re-use that token here.
+    let csrf = window._CSRF || null;
+    if (!csrf) {
+      try {
+        const me = await fetch("/api/auth/me", { credentials: "same-origin" });
+        const meJson = await me.json();
+        csrf = meJson.csrf || null;
+      } catch (_) { /* leave null */ }
+    }
+    const r = await fetch(`/api/crm/campaigns/${CAMPAIGN_ID}/upload`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: csrf ? { "X-CSRF-Token": csrf } : {},
+      body: fd,
+    });
+    const data = await r.json();
+    if (!r.ok) throw { data: data, status: r.status };
+    uploadId = data.upload_id;
+  } catch (e) {
+    document.getElementById("uploadStateRunning").hidden = true;
+    document.getElementById("uploadStateIdle").hidden = false;
+    document.getElementById("uploadGoBtn").disabled = false;
+    toastError(e);
+    return;
+  }
+
+  // Poll every 2s, cap at 60 tries (~2 minutes).
+  pollTries = 0;
+  pollTimer = setInterval(() => pollOnce(uploadId), 2000);
+}
+
+async function pollOnce(uploadId) {
+  pollTries += 1;
+  if (pollTries > 60) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+    showUploadResult({ status: "FAILED", error_message: t("crm.upload.timeout") || "Timed out" });
+    return;
+  }
+  try {
+    const s = await api(`/api/crm/uploads/${uploadId}/status`);
+    if (s.status === "COMPLETED" || s.status === "FAILED") {
+      clearInterval(pollTimer);
+      pollTimer = null;
+      showUploadResult(s);
+    } else {
+      const lbl = document.getElementById("uploadProgressLabel");
+      lbl.textContent = `${t("crm.upload.processing")} (${pollTries}/60)`;
+    }
+  } catch (e) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+    showUploadResult({ status: "FAILED", error_message: tError(e) });
+  }
+}
+
+function showUploadResult(s) {
+  document.getElementById("uploadStateRunning").hidden = true;
+  document.getElementById("uploadStateResult").hidden = false;
+  document.getElementById("uploadGoBtn").hidden = true;
+  document.getElementById("uploadCancelBtn").hidden = true;
+  document.getElementById("uploadDoneBtn").hidden = false;
+
+  const banner = document.getElementById("uploadResultBanner");
+  if (s.status === "FAILED") {
+    banner.className = "upload-result-banner is-error";
+    banner.textContent = (s.error_message || t("crm.upload.failed"));
+    return;
+  }
+  banner.className = "upload-result-banner is-success";
+  banner.textContent = t("crm.upload.completed");
+
+  // Summary table
+  const grid = document.getElementById("uploadSummary");
+  grid.innerHTML = "";
+  const rows = [
+    ["crm.upload.summary.total_events", s.total_events],
+    ["crm.upload.summary.new_events", s.new_events],
+    ["crm.upload.summary.duplicates", s.duplicate_events],
+  ];
+  rows.forEach(([k, v]) => {
+    const dt = document.createElement("dt");
+    dt.setAttribute("data-i18n", k);
+    dt.textContent = t(k);
+    const dd = document.createElement("dd");
+    dd.textContent = fmtNum(v || 0);
+    grid.appendChild(dt);
+    grid.appendChild(dd);
+  });
+
+  // Warnings — unmatched reps + unmatched stages + generic warnings
+  const warnHost = document.getElementById("uploadWarnings");
+  warnHost.innerHTML = "";
+  const unmatchedReps = s.unmatched_sales_reps || [];
+  const unmatchedStages = s.unmatched_stages || [];
+  if (unmatchedReps.length) {
+    warnHost.appendChild(buildWarnBlock("crm.upload.warnings.unmatched_reps", unmatchedReps));
+  }
+  if (unmatchedStages.length) {
+    warnHost.appendChild(buildWarnBlock("crm.upload.warnings.unmatched_stages", unmatchedStages));
+  }
+  if (Array.isArray(s.warnings) && s.warnings.length) {
+    warnHost.appendChild(buildWarnBlock("crm.upload.warnings.other", s.warnings.slice(0, 20)));
+  }
+}
+
+function buildWarnBlock(titleKey, items) {
+  const wrap = document.createElement("div");
+  wrap.className = "upload-warn-block";
+  const h = document.createElement("h4");
+  h.setAttribute("data-i18n", titleKey);
+  h.textContent = t(titleKey);
+  wrap.appendChild(h);
+  const ul = document.createElement("ul");
+  items.forEach(item => {
+    const li = document.createElement("li");
+    li.textContent = String(item);
+    ul.appendChild(li);
+  });
+  wrap.appendChild(ul);
+  return wrap;
+}
+
+function finishUpload() {
+  closeModal("uploadModal");
+  // Hard reload — the overview hits the freshly-computed campaign_kpis row.
+  window.location.reload();
+}
+
+// ─── Small utilities (intentionally local to keep common.js untouched) ─
+function setText(id, txt) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = txt;
+}
+function fmtNum(n) {
+  if (n == null) return "—";
+  try { return Number(n).toLocaleString(); } catch (_) { return String(n); }
+}
+function fmtDateShort(iso) {
+  try {
+    return new Intl.DateTimeFormat(getLang() === "ar" ? "ar-EG" : "en-GB",
+      { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));
+  } catch (_) { return iso; }
+}
+function fmtDateTimeShort(iso) {
+  try {
+    return new Intl.DateTimeFormat(getLang() === "ar" ? "ar-EG" : "en-GB",
+      { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+  } catch (_) { return iso; }
+}
+function escapeHtml(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Sales Performance tab (P2)
+// ════════════════════════════════════════════════════════════════════
+
+let salesData = null;
+
+async function loadSalesKpis() {
+  try {
+    salesData = await api(`/api/crm/campaigns/${CAMPAIGN_ID}/sales-kpis`);
+    renderSalesKpis();
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+function renderSalesKpis() {
+  if (!salesData) return;
+  const reps = salesData.reps || [];
+  const unmatched = salesData.unmatched_reps_summary || {};
+
+  renderSalesUnmatched(unmatched);
+
+  const hasReps = reps.length > 0;
+  document.getElementById("salesChartsBlock").hidden = !hasReps;
+  document.getElementById("salesTableWrap").hidden = !hasReps;
+  if (!hasReps) return;
+
+  renderSalesCharts(reps);
+  renderSalesTable(reps);
+}
+
+function renderSalesUnmatched(unmatched) {
+  const entries = Object.entries(unmatched);
+  const card = document.getElementById("salesUnmatchedWarn");
+  if (!entries.length) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  const total = entries.reduce((sum, [, n]) => sum + n, 0);
+  document.getElementById("salesUnmatchedTitle").textContent =
+    t("crm.sales.unmatched_warning").replace("{count}", fmtNum(total));
+  const ul = document.getElementById("salesUnmatchedList");
+  ul.innerHTML = "";
+  entries
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)  // cap the visible list; the warning carries the full count
+    .forEach(([name, n]) => {
+      const li = document.createElement("li");
+      li.innerHTML = `<strong>${escapeHtml(name)}</strong> · ${fmtNum(n)}`;
+      ul.appendChild(li);
+    });
+}
+
+function renderSalesCharts(reps) {
+  const repLabels = reps.map(r => r.sales_name || `#${r.sales_user_id}`);
+
+  // Chart 1: Fresh vs Rotation lead-count per rep, stacked.
+  Charts.drawStackedBar(
+    "salesTotalsChart",
+    [
+      { name: t("crm.sales.fresh_leads"),    values: reps.map(r => r.fresh_leads_count    || 0) },
+      { name: t("crm.sales.rotation_leads"), values: reps.map(r => r.rotation_leads_count || 0) },
+    ],
+    repLabels,
+  );
+
+  // Charts 2 + 3: per-stage outcomes stacked. One series per stage token
+  // so the legend itself doubles as the colour key. Stages with zero
+  // counts across all reps are dropped — they'd otherwise sit in the
+  // legend taking up space.
+  drawOutcomesChart("salesFreshChart",    reps, repLabels, "fresh_outcomes");
+  drawOutcomesChart("salesRotationChart", reps, repLabels, "rotation_outcomes");
+}
+
+function drawOutcomesChart(containerId, reps, repLabels, field) {
+  const series = [];
+  STAGE_TOKENS.forEach(tok => {
+    const values = reps.map(r => (r[field] || {})[tok] || 0);
+    if (values.some(v => v > 0)) {
+      series.push({ name: t("crm.stages." + tok), values });
+    }
+  });
+  if (!series.length) {
+    // Draw an empty placeholder so the chart-card height doesn't
+    // collapse — keeps the bento grid balanced.
+    Charts.drawStackedBar(containerId, [{ name: " ", values: repLabels.map(() => 0) }], repLabels);
+    return;
+  }
+  Charts.drawStackedBar(containerId, series, repLabels);
+}
+
+function renderSalesTable(reps) {
+  const tbody = document.getElementById("salesRepRows");
+  tbody.innerHTML = "";
+  reps.forEach(r => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>
+        <div class="sales-rep-cell">
+          ${avatarHtml(r)}
+          <div class="sales-rep-name">${escapeHtml(r.sales_name || "")}</div>
+        </div>
+      </td>
+      <td style="text-align:end">${fmtNum(r.fresh_leads_count || 0)}</td>
+      <td>${outcomeChipsHtml(r.fresh_outcomes || {})}</td>
+      <td style="text-align:end">${fmtNum(r.rotation_leads_count || 0)}</td>
+      <td>${outcomeChipsHtml(r.rotation_outcomes || {})}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function avatarHtml(r) {
+  if (r.avatar_url) {
+    return `<span class="sales-avatar"><img src="${escapeHtml(r.avatar_url)}" alt=""></span>`;
+  }
+  const initial = (r.sales_name || "?").trim().charAt(0).toUpperCase() || "?";
+  return `<span class="sales-avatar sales-avatar-initial">${escapeHtml(initial)}</span>`;
+}
+
+function outcomeChipsHtml(outcomes) {
+  // Stable order matches the donut so visual cross-reference works. Empty
+  // dict (no events in window yet) shows an em-dash.
+  const parts = [];
+  STAGE_TOKENS.forEach(tok => {
+    const n = outcomes[tok];
+    if (n && n > 0) {
+      parts.push(
+        `<span class="outcome-chip outcome-${tok.toLowerCase()}">` +
+        `${escapeHtml(t("crm.stages." + tok))} <strong>${fmtNum(n)}</strong>` +
+        `</span>`
+      );
+    }
+  });
+  return parts.length ? parts.join(" ") : `<span class="text-dim">—</span>`;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Leads tab (P3)
+// ════════════════════════════════════════════════════════════════════
+
+let leadsAll = [];           // accumulated rows across "Load more" pages
+let leadsCursor = null;
+let leadsTotal = 0;
+let leadsSearchDebounce = null;
+
+function leadsCurrentFilters() {
+  return {
+    stage: document.getElementById("leadsStageFilter").value,
+    sales_user_id: document.getElementById("leadsRepFilter").value,
+    has_intervention: document.getElementById("leadsInterventionFilter").value,
+    search: document.getElementById("leadsSearch").value.trim(),
+  };
+}
+
+async function loadLeadsRepFilter() {
+  // Build the Sales Rep dropdown from sales-kpis (the same rep list the
+  // Sales tab uses). Calling salesData first if available avoids a 2nd
+  // network round-trip.
+  let reps = (salesData && salesData.reps) || null;
+  if (!reps) {
+    try {
+      const data = await api(`/api/crm/campaigns/${CAMPAIGN_ID}/sales-kpis`);
+      reps = data.reps || [];
+    } catch (e) { reps = []; }
+  }
+  const sel = document.getElementById("leadsRepFilter");
+  // Clear all but the "all" option.
+  while (sel.options.length > 1) sel.remove(1);
+  reps.forEach(r => {
+    const opt = document.createElement("option");
+    opt.value = String(r.sales_user_id);
+    opt.textContent = r.sales_name;
+    sel.appendChild(opt);
+  });
+}
+
+async function loadLeads(append) {
+  const f = leadsCurrentFilters();
+  const params = new URLSearchParams();
+  if (f.stage && f.stage !== "all") params.set("stage", f.stage);
+  if (f.sales_user_id && f.sales_user_id !== "all") params.set("sales_user_id", f.sales_user_id);
+  if (f.has_intervention && f.has_intervention !== "all") params.set("has_intervention", f.has_intervention);
+  if (f.search) params.set("search", f.search);
+  if (append && leadsCursor) params.set("cursor", leadsCursor);
+
+  try {
+    const r = await api(`/api/crm/campaigns/${CAMPAIGN_ID}/leads?${params.toString()}`);
+    if (!append) leadsAll = [];
+    leadsAll = leadsAll.concat(r.leads || []);
+    leadsCursor = r.next_cursor;
+    leadsTotal = r.total_count || 0;
+    renderLeadsTable();
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+function renderLeadsTable() {
+  const tbody = document.getElementById("leadsRows");
+  tbody.innerHTML = "";
+  if (!leadsAll.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="text-muted" style="padding:18px;text-align:center" data-i18n="crm.leads.empty"></td></tr>`;
+    applyLang(true);
+  } else {
+    leadsAll.forEach(l => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(l.client_name || "—")}</td>
+        <td><span class="text-muted">${escapeHtml(l.mobile || "")}</span></td>
+        <td>${l.latest_stage
+              ? `<span class="outcome-chip outcome-${l.latest_stage.toLowerCase()}">${escapeHtml(t("crm.stages." + l.latest_stage))}</span>`
+              : `<span class="text-dim">—</span>`}</td>
+        <td>${escapeHtml(l.current_sales_rep || "—")}</td>
+        <td style="text-align:end">${fmtNum(l.event_count || 0)}</td>
+        <td>${escapeHtml(fmtDateShort(l.last_event_at))}</td>
+        <td>${l.has_intervention
+              ? `<span class="lead-int-pill is-${(l.intervention_priority || "").toLowerCase()}">${escapeHtml(t("crm.intervention.priority." + (l.intervention_priority || "").toLowerCase()))}</span>`
+              : `<span class="text-dim">—</span>`}</td>
+        <td style="text-align:end">
+          <a class="btn btn-sm" href="/marketing/campaigns/${CAMPAIGN_ID}/leads/${l.lead_id}">
+            <span data-i18n="crm.leads.action.view"></span>
+          </a>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+    applyLang(true);
+  }
+
+  document.getElementById("leadsTotalLabel").textContent =
+    `${fmtNum(leadsAll.length)} / ${fmtNum(leadsTotal)}`;
+  document.getElementById("leadsLoadMore").hidden = !leadsCursor;
+}
+
+function fmtDateShort(iso) {
+  if (!iso) return "—";
+  try {
+    return new Intl.DateTimeFormat(getLang() === "ar" ? "ar-EG" : "en-GB",
+      { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));
+  } catch (_) { return iso; }
+}
+
+// Filter change listeners — debounce search, reset cursor on any change.
+function _leadsFilterChanged() {
+  leadsCursor = null;
+  loadLeads(false);
+}
+document.getElementById("leadsStageFilter").addEventListener("change", _leadsFilterChanged);
+document.getElementById("leadsRepFilter").addEventListener("change", _leadsFilterChanged);
+document.getElementById("leadsInterventionFilter").addEventListener("change", _leadsFilterChanged);
+document.getElementById("leadsSearch").addEventListener("input", () => {
+  if (leadsSearchDebounce) clearTimeout(leadsSearchDebounce);
+  leadsSearchDebounce = setTimeout(_leadsFilterChanged, 280);
+});
+
+// ════════════════════════════════════════════════════════════════════
+// Manager Intervention tab (P3) — per-campaign view; cards are built by
+// the shared buildInterventionCard() defined in marketing_intervention.html,
+// but that template isn't loaded here. We inline the same builder, scoped
+// to this page, so the campaign tab stays self-contained.
+// ════════════════════════════════════════════════════════════════════
+
+async function loadInterventionTab() {
+  const params = new URLSearchParams();
+  const status = document.getElementById("invTabStatus").value;
+  const priority = document.getElementById("invTabPriority").value;
+  if (status) params.set("status", status);
+  if (priority) params.set("priority", priority);
+  try {
+    const rows = await api(`/api/crm/campaigns/${CAMPAIGN_ID}/intervention?${params.toString()}`);
+    renderInterventionTab(rows || []);
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+function renderInterventionTab(rows) {
+  const list = document.getElementById("invTabList");
+  const empty = document.getElementById("invTabEmpty");
+  list.innerHTML = "";
+  if (!rows.length) {
+    list.style.display = "none";
+    empty.hidden = false;
+    return;
+  }
+  list.style.display = "grid";
+  empty.hidden = true;
+  rows.forEach(r => list.appendChild(buildCampaignInterventionCard(r)));
+}
+
+function buildCampaignInterventionCard(r) {
+  const li = document.createElement("article");
+  li.className = "iv-card iv-pri-" + (r.priority || "").toLowerCase();
+  const priorityClass = r.priority === "HIGH" ? "is-high" : "is-medium";
+  const recKey = r.trigger_type === "NO_ANSWER_AFTER_MEETING"
+    ? "crm.intervention.recommendation.meeting"
+    : "crm.intervention.recommendation.following";
+  const triggerKey = "crm.intervention.trigger." + (r.trigger_type || "").toLowerCase();
+  const statusClass = "status-" + (r.status || "OPEN").toLowerCase();
+
+  li.innerHTML = `
+    <div class="iv-card-head">
+      <span class="iv-priority ${priorityClass}">${escapeHtml(t("crm.intervention.priority." + (r.priority || "").toLowerCase()))}</span>
+      <span class="iv-status ${statusClass}">${escapeHtml(t("crm.intervention.status." + (r.status || "OPEN").toLowerCase()))}</span>
+    </div>
+    <h3 class="iv-client">${escapeHtml(r.client_name || r.mobile || "—")}</h3>
+    <p class="iv-mobile">${escapeHtml(r.mobile || "")}</p>
+    <div class="iv-trigger">${escapeHtml(t(triggerKey))}</div>
+    <p class="iv-rec">${escapeHtml(t(recKey))}</p>
+    <dl class="iv-meta">
+      <dt>${escapeHtml(t("crm.timeline.current_rep"))}</dt>
+      <dd>${escapeHtml(r.current_sales_rep_name || "—")}</dd>
+      <dt>${escapeHtml(t("crm.intervention.last_positive_date"))}</dt>
+      <dd>${escapeHtml(fmtDateShort(r.last_positive_stage_date))}</dd>
+      <dt>${escapeHtml(t("crm.intervention.last_no_answer_date"))}</dt>
+      <dd>${escapeHtml(fmtDateShort(r.last_no_answer_date))}</dd>
+      ${r.last_comment ? `<dt>${escapeHtml(t("crm.intervention.last_comment"))}</dt>
+      <dd class="iv-comment">${escapeHtml(r.last_comment)}</dd>` : ""}
+    </dl>
+    <div class="iv-actions">
+      <a class="btn btn-sm btn-ghost" href="/marketing/campaigns/${CAMPAIGN_ID}/leads/${r.lead_id}">
+        ${escapeHtml(t("crm.intervention.action.open_timeline"))}
+      </a>
+      ${r.status !== "REVIEWED" ? `<button class="btn btn-sm" data-action="REVIEWED" data-id="${r.id}">
+        ${escapeHtml(t("crm.intervention.action.mark_reviewed"))}</button>` : ""}
+      ${r.status !== "CLOSED" ? `<button class="btn btn-sm btn-primary" data-action="CLOSED" data-id="${r.id}">
+        ${escapeHtml(t("crm.intervention.action.close"))}</button>` : ""}
+      ${r.status !== "OPEN" ? `<button class="btn btn-sm btn-ghost" data-action="OPEN" data-id="${r.id}">
+        ${escapeHtml(t("crm.intervention.action.reopen"))}</button>` : ""}
+    </div>
+  `;
+  li.querySelectorAll("button[data-action]").forEach(b => {
+    b.addEventListener("click", async (e) => {
+      const action = e.currentTarget.getAttribute("data-action");
+      const id = parseInt(e.currentTarget.getAttribute("data-id"), 10);
+      try {
+        await api(`/api/crm/intervention/${id}`, { method: "PATCH", body: { status: action } });
+        toast(t("common.saved"), "success");
+        await loadInterventionTab();
+        // Refresh overview KPI tile and sidebar badge.
+        loadOverview();
+        if (typeof refreshInterventionBadge === "function") refreshInterventionBadge();
+      } catch (err) { toastError(err); }
+    });
+  });
+  return li;
+}
+
+document.getElementById("invTabStatus").addEventListener("change", loadInterventionTab);
+document.getElementById("invTabPriority").addEventListener("change", loadInterventionTab);
+
+
+// ════════════════════════════════════════════════════════════════════
+// Daily Activity tab (P4)
+// ════════════════════════════════════════════════════════════════════
+
+let dailyData = null;
+
+function seedDailyDates() {
+  // Seed the inputs with [last 30 days .. today] in the browser's locale.
+  // Server will use the same default if we leave them blank, but pre-
+  // populating tells the user what range they're looking at.
+  const today = new Date();
+  const start = new Date(today);
+  start.setDate(start.getDate() - 29);
+  document.getElementById("dailyTo").value = today.toISOString().slice(0, 10);
+  document.getElementById("dailyFrom").value = start.toISOString().slice(0, 10);
+}
+
+async function loadDaily() {
+  const from = document.getElementById("dailyFrom").value;
+  const to = document.getElementById("dailyTo").value;
+  const params = new URLSearchParams();
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+  try {
+    dailyData = await api(`/api/crm/campaigns/${CAMPAIGN_ID}/daily-activity?${params.toString()}`);
+    renderDaily();
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+function renderDaily() {
+  if (!dailyData) return;
+  const days = dailyData.days || [];
+  const totals = dailyData.totals || {};
+
+  // Top tiles
+  document.getElementById("dailyTotal").textContent = fmtNum(totals.total_attempts);
+  document.getElementById("dailyAnswered").textContent = fmtNum(totals.answered_count);
+  document.getElementById("dailyRate").textContent =
+    (totals.total_attempts > 0 ? totals.response_rate_pct + "%" : "—");
+
+  const hasData = totals.total_attempts > 0;
+  document.getElementById("dailyChartsBlock").hidden = !hasData;
+  document.getElementById("dailyTableWrap").hidden = !hasData;
+  if (!hasData) return;
+
+  const xLabels = days.map(d => d.date);
+  // Chart 1: attempts vs answered as two lines so the gap is visible.
+  Charts.drawLineChart("dailyAttemptsChart", [
+    { name: t("crm.daily.total_attempts"), x: xLabels, y: days.map(d => d.total_attempts) },
+    { name: t("crm.daily.answered"),       x: xLabels, y: days.map(d => d.answered_count) },
+  ]);
+  // Chart 2: per-stage stacked bars per day.
+  Charts.drawStackedBar("dailyStageChart", [
+    { name: t("crm.stages.NO_ANSWER"),    values: days.map(d => d.no_answer_count) },
+    { name: t("crm.stages.FOLLOWING"),    values: days.map(d => d.following_count) },
+    { name: t("crm.stages.MEETING"),      values: days.map(d => d.meeting_count) },
+    { name: t("crm.stages.CANCELLATION"), values: days.map(d => d.cancellation_count) },
+    { name: t("crm.stages.INTERESTED"),   values: days.map(d => d.interested_count) },
+  ], xLabels);
+  // Chart 3: response-rate line.
+  Charts.drawLineChart("dailyRateChart", [
+    { name: t("crm.daily.response_rate"), x: xLabels, y: days.map(d => d.response_rate_pct) },
+  ]);
+
+  // Detail table
+  const tbody = document.getElementById("dailyRows");
+  tbody.innerHTML = "";
+  days.forEach(d => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(fmtDateShort(d.date))}</td>
+      <td style="text-align:end">${fmtNum(d.total_attempts)}</td>
+      <td style="text-align:end">${fmtNum(d.no_answer_count)}</td>
+      <td style="text-align:end">${fmtNum(d.following_count)}</td>
+      <td style="text-align:end">${fmtNum(d.meeting_count)}</td>
+      <td style="text-align:end">${fmtNum(d.cancellation_count)}</td>
+      <td style="text-align:end">${fmtNum(d.interested_count)}</td>
+      <td style="text-align:end">${fmtNum(d.answered_count)}</td>
+      <td style="text-align:end">${d.response_rate_pct}%</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Marketing Report tab (P4)
+// ════════════════════════════════════════════════════════════════════
+
+let mktrData = null;
+
+async function loadMarketingReport() {
+  try {
+    mktrData = await api(`/api/crm/campaigns/${CAMPAIGN_ID}/marketing-report`);
+    renderMarketingReport();
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+function renderMarketingReport() {
+  if (!mktrData) return;
+  const total = mktrData.total_unique_leads || 0;
+  document.getElementById("mktrBody").hidden = total <= 0;
+  if (total <= 0) return;
+
+  document.getElementById("mktrTotal").textContent     = fmtNum(total);
+  document.getElementById("mktrResponse").textContent  = mktrData.response_rate_pct + "%";
+  document.getElementById("mktrNoAnswer").textContent  = mktrData.no_answer_rate_pct + "%";
+
+  // Donut — reuse the same color story as Overview.
+  const labels = [];
+  const values = [];
+  STAGE_TOKENS.forEach(tok => {
+    const n = (mktrData.stage_breakdown_unique || {})[tok] || 0;
+    if (n > 0) {
+      labels.push(t("crm.stages." + tok));
+      values.push(n);
+    }
+  });
+  Charts.drawDonut("mktrDonut", { labels, values });
+
+  // Insights — static rules, not "AI". Each rule emits a single bullet.
+  const insights = [];
+  if (mktrData.response_rate_pct >= 60)
+    insights.push({ icon: "trending_up", color: "var(--accent-2)", textKey: "crm.marketing.insight.high_response" });
+  else if (mktrData.response_rate_pct >= 40)
+    insights.push({ icon: "trending_flat", color: "var(--text-muted)", textKey: "crm.marketing.insight.moderate_response" });
+  else
+    insights.push({ icon: "trending_down", color: "var(--warning)", textKey: "crm.marketing.insight.low_response" });
+
+  if (mktrData.intervention_rate_pct >= 10)
+    insights.push({ icon: "warning", color: "var(--danger)", textKey: "crm.marketing.insight.high_intervention" });
+  if ((mktrData.stage_breakdown_unique || {}).MEETING > 0)
+    insights.push({ icon: "handshake", color: "var(--brand)", textKey: "crm.marketing.insight.has_meetings" });
+
+  const ul = document.getElementById("mktrInsights");
+  ul.innerHTML = "";
+  insights.forEach(ins => {
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <span class="material-symbols-outlined" style="color:${ins.color}" aria-hidden="true">${ins.icon}</span>
+      <span data-i18n="${ins.textKey}">${escapeHtml(t(ins.textKey))}</span>
+    `;
+    ul.appendChild(li);
+  });
+
+  // Rate comparison bars
+  setBar("mktrBarResponse",     mktrData.response_rate_pct);
+  setBar("mktrBarNoAnswer",     mktrData.no_answer_rate_pct);
+  setBar("mktrBarIntervention", mktrData.intervention_rate_pct);
+}
+
+function setBar(barId, pct) {
+  const clamped = Math.max(0, Math.min(100, pct || 0));
+  document.getElementById(barId).style.width = clamped + "%";
+  document.getElementById(barId + "Lbl").textContent = (pct || 0) + "%";
+}
+
+
+function onLangChange() {
+  if (overview) renderOverview();
+  if (salesData) renderSalesKpis();
+  if (leadsLoaded) renderLeadsTable();
+  if (invTabLoaded) loadInterventionTab();
+  if (dailyData) renderDaily();
+  if (mktrData) renderMarketingReport();
+}
+function onThemeChange() {
+  if (overview) renderStageDonut(overview.stage_counts || {});
+  if (salesData) renderSalesCharts(salesData.reps || []);
+  if (dailyData) renderDaily();
+  if (mktrData) renderMarketingReport();
+}
+
+loadOverview();
+</script>
+
+<!-- Page-scoped CSS — uses existing tokens, no new design language. -->
+<style>
+  /* ── Tab bar ─────────────────────────────────────────────────────── */
+  .crm-tabs {
+    display: flex;
+    gap: 2px;
+    flex-wrap: wrap;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 24px;
+    padding: 0 2px;
+  }
+  .crm-tab {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: transparent;
+    border: none;
+    padding: 11px 16px;
+    font: inherit; font-size: 13px; font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .crm-tab-icon { font-size: 17px; }
+  .crm-tab:hover { color: var(--text); background: var(--surface-recessed); }
+  .crm-tab.is-active {
+    color: var(--brand);
+    border-bottom-color: var(--brand);
+    font-weight: 600;
+  }
+  /* .crm-tab-panel padding is set in the shared helpers block below */
+
+  /* ── Shared layout helpers ───────────────────────────────────────── */
+  .crm-tab-panel { padding-top: 8px; }
+  .crm-bento { gap: 24px; margin-bottom: 24px; }
+  .crm-table-card { margin-top: 24px; padding: 0; overflow-x: auto; }
+  .crm-filter-bar { padding: 16px 20px; margin-bottom: 22px; }
+  .crm-filter-row { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
+  .crm-panel-header { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .crm-rates-card { padding: 22px 24px; margin-top: 24px; }
+
+  /* Icon inside chart-card-header */
+  .chart-card-header { display: flex; align-items: center; gap: 8px; }
+  .crm-chart-icon { font-size: 18px; color: var(--brand); opacity: 0.7; flex-shrink: 0; }
+  .fresh-icon    { color: var(--accent-2); }
+  .rotation-icon { color: var(--secondary); }
+
+
+  /* ── Unmatched warning banner ────────────────────────────────────── */
+  .crm-warn-banner {
+    display: flex; gap: 14px; align-items: flex-start;
+    padding: 14px 18px; margin-bottom: 20px;
+    background: rgba(196,114,0,0.07);
+    border: 1px solid rgba(196,114,0,0.25);
+    border-inline-start: 4px solid var(--warning);
+    border-radius: var(--radius);
+  }
+  .crm-warn-banner > .material-symbols-outlined {
+    color: var(--warning); flex-shrink: 0; margin-top: 2px; font-size: 22px;
+  }
+
+  /* ── Intervention panel (Overview) ──────────────────────────────── */
+  .crm-intervention-panel { padding: 18px; display: flex; flex-direction: column; }
+
+  /* Floating Upload FAB. inset-inline-end keeps it on the trailing edge
+     in both RTL and LTR. */
+  .crm-fab {
+    position: fixed;
+    bottom: 24px;
+    inset-inline-end: 24px;
+    z-index: 100;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 22px;
+    background: var(--grad-brand);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    font: inherit;
+    font-weight: 600;
+    box-shadow: 0 8px 28px rgba(71, 77, 197, 0.42), inset 0 1px 0 rgba(255,255,255,0.2);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .crm-fab:hover { transform: translateY(-2px); box-shadow: 0 12px 36px rgba(71,77,197,0.48); }
+  .crm-fab:active { transform: translateY(0); }
+
+  /* Intervention list — uses existing tokens. */
+  .intervention-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+  .intervention-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 10px 12px;
+    background: var(--surface-recessed);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .intervention-priority {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 3px 8px;
+    border-radius: var(--radius-pill);
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .intervention-priority.is-high   { background: rgba(186,26,26,0.10); color: var(--danger); }
+  .intervention-priority.is-medium { background: rgba(196,114,0,0.12); color: var(--warning); }
+  .intervention-body { flex: 1; min-width: 0; }
+  .intervention-name { font-weight: 600; }
+  .intervention-meta { font-size: 12px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .intervention-empty { padding: 14px 4px; }
+
+  /* Upload modal — minimal additions. */
+  .upload-result-banner {
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 14px;
+    font-weight: 500;
+  }
+  .upload-result-banner.is-success {
+    background: rgba(0, 131, 124, 0.08); color: var(--accent-2);
+    border: 1px solid rgba(0, 131, 124, 0.32);
+  }
+  .upload-result-banner.is-error {
+    background: var(--danger-soft); color: var(--danger);
+    border: 1px solid rgba(186, 26, 26, 0.25);
+  }
+  .upload-summary-grid {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    row-gap: 6px;
+    column-gap: 16px;
+    margin: 0 0 14px;
+  }
+  .upload-summary-grid dt { color: var(--text-muted); font-size: 13px; }
+  .upload-summary-grid dd { margin: 0; font-weight: 600; }
+  .upload-warn-block { margin-top: 10px; }
+  .upload-warn-block h4 {
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--warning); margin: 0 0 6px;
+  }
+  .upload-warn-block ul { margin: 0; padding-inline-start: 18px; font-size: 13px; color: var(--text-muted); }
+  .upload-warn-block li { margin: 2px 0; }
+  .hero-dot { margin: 0 6px; color: var(--text-dim); }
+  .hero-actions { display: flex; gap: 8px; }
+  .text-link { color: var(--brand); text-decoration: none; font-size: 13px; font-weight: 600; }
+  .text-link:hover { text-decoration: underline; }
+
+  /* ── Sales tab styles ─────────────────────────────────────────── */
+  .sales-unmatched-card {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 14px 18px;
+    border-left: 3px solid var(--warning);
+    background: rgba(196,114,0,0.06);
+    margin-bottom: 18px;
+  }
+  .sales-unmatched-card .material-symbols-outlined {
+    color: var(--warning); flex-shrink: 0; margin-top: 2px;
+  }
+  .sales-unmatched-body { flex: 1; min-width: 0; }
+  .sales-unmatched-title { font-weight: 600; color: var(--warning); }
+  .sales-unmatched-list {
+    margin: 6px 0 0; padding-inline-start: 18px;
+    color: var(--text-muted); font-size: 13px;
+  }
+  .sales-unmatched-list li { margin: 2px 0; }
+
+  .sales-rep-cell { display: flex; align-items: center; gap: 10px; }
+  .sales-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--surface-recessed);
+    overflow: hidden; display: inline-flex;
+    align-items: center; justify-content: center;
+    flex-shrink: 0;
+    font-weight: 700; color: var(--text-muted);
+  }
+  .sales-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .sales-avatar-initial { background: var(--brand-soft); color: var(--brand); }
+  .sales-rep-name { font-weight: 500; }
+
+  /* Outcome chips — small badges colored to match the stage palette.
+     Colour tokens reuse the in-app values: brand for follow-up,
+     accent for meeting, danger for cancellation, warning for no-answer. */
+  .outcome-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 9px; border-radius: 9999px;
+    font-size: 11px; font-weight: 500;
+    background: var(--surface-recessed);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    margin-inline-end: 4px;
+    white-space: nowrap;
+  }
+  .outcome-chip strong { color: var(--text); font-weight: 700; }
+  .outcome-chip.outcome-no_answer    { background: rgba(196,114,0,0.10); border-color: rgba(196,114,0,0.20); }
+  .outcome-chip.outcome-following    { background: var(--brand-soft); border-color: rgba(71,77,197,0.18); color: var(--brand); }
+  .outcome-chip.outcome-meeting      { background: rgba(0,103,98,0.10); border-color: rgba(0,103,98,0.22); color: var(--accent-2); }
+  .outcome-chip.outcome-cancellation { background: rgba(186,26,26,0.08); border-color: rgba(186,26,26,0.20); color: var(--danger); }
+  .outcome-chip.outcome-interested   { background: rgba(64,220,209,0.14); border-color: rgba(64,220,209,0.28); color: var(--accent-2); }
+  .outcome-chip.outcome-request      { background: rgba(124,131,253,0.10); border-color: rgba(124,131,253,0.22); color: var(--brand); }
+
+  /* Leads-tab — small intervention pill on the table row. */
+  .lead-int-pill {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+    padding: 2px 9px; border-radius: 9999px; text-transform: uppercase;
+  }
+  .lead-int-pill.is-high   { background: rgba(186,26,26,0.10); color: var(--danger); }
+  .lead-int-pill.is-medium { background: rgba(196,114,0,0.12); color: var(--warning); }
+
+  /* Intervention card grid — shared with the cross-campaign inbox page;
+     kept page-local so the in-campaign tab is self-contained. */
+  .iv-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 14px;
+  }
+  .iv-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    box-shadow: var(--shadow-xs);
+    border-inline-start: 3px solid var(--text-dim);
+  }
+  .iv-card.iv-pri-high   { border-inline-start-color: var(--danger); }
+  .iv-card.iv-pri-medium { border-inline-start-color: var(--warning); }
+  .iv-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .iv-priority {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+    padding: 2px 10px; border-radius: 9999px; text-transform: uppercase;
+  }
+  .iv-priority.is-high   { background: rgba(186,26,26,0.10); color: var(--danger); }
+  .iv-priority.is-medium { background: rgba(196,114,0,0.12); color: var(--warning); }
+  .iv-status {
+    margin-inline-start: auto;
+    font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 9999px;
+    background: var(--surface-recessed); color: var(--text-muted);
+  }
+  .iv-status.status-open     { background: rgba(186,26,26,0.10); color: var(--danger); }
+  .iv-status.status-reviewed { background: rgba(196,114,0,0.12); color: var(--warning); }
+  .iv-status.status-closed   { background: rgba(0,103,98,0.10); color: var(--accent-2); }
+  .iv-client { font-size: 16px; font-weight: 700; margin: 0 0 2px; }
+  .iv-mobile { font-size: 13px; color: var(--text-muted); margin: 0 0 12px; }
+  .iv-trigger { font-size: 12px; font-weight: 600; color: var(--brand); margin-bottom: 6px; }
+  .iv-rec { font-size: 13px; color: var(--text-muted); margin: 0 0 14px; line-height: 1.55; }
+  .iv-meta {
+    display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px;
+    margin: 0 0 14px; font-size: 12px;
+  }
+  .iv-meta dt { color: var(--text-muted); font-weight: 600; }
+  .iv-meta dd { margin: 0; color: var(--text); }
+  .iv-comment { white-space: normal; line-height: 1.55; }
+  .iv-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* Marketing Report — insights + rate bars. */
+  .mktr-insights { list-style: none; margin: 0; padding: 0; }
+  .mktr-insights li {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0;
+    font-size: 14px; color: var(--text);
+    border-bottom: 1px solid var(--border);
+  }
+  .mktr-insights li:last-child { border-bottom: none; }
+  .mktr-insights .material-symbols-outlined { font-size: 20px; flex-shrink: 0; }
+
+  .mktr-rate-grid {
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .mktr-rate { display: grid; grid-template-columns: 160px 1fr 60px; gap: 12px; align-items: center; }
+  .mktr-rate-label { font-size: 13px; color: var(--text-muted); font-weight: 600; }
+  .mktr-rate-value { font-weight: 700; text-align: end; color: var(--text); }
+  .mktr-bar {
+    height: 10px; border-radius: 9999px;
+    background: var(--surface-recessed);
+    overflow: hidden;
+  }
+  .mktr-bar-fill {
+    height: 100%;
+    transition: width 0.4s var(--ease);
+    border-radius: 9999px;
+  }
+  .mktr-bar-fill.is-positive { background: linear-gradient(90deg, var(--accent-2), #40dcd1); }
+  .mktr-bar-fill.is-warn     { background: linear-gradient(90deg, var(--warning), #ffb84d); }
+  .mktr-bar-fill.is-danger   { background: linear-gradient(90deg, var(--danger), #ff6b6b); }
+
+  @media (max-width: 600px) {
+    .mktr-rate { grid-template-columns: 1fr; gap: 4px; }
+    .mktr-rate-value { text-align: start; }
+  }
+</style>
+{% endblock %}

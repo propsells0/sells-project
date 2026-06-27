@@ -1,0 +1,443 @@
+{% extends "base.html" %}
+{% block title %}Lead Timeline · CRM{% endblock %}
+
+{% block content %}
+<!-- Hero — client identity + back link. Everything else is JS-rendered. -->
+<section class="hero-ribbon">
+  <div>
+    <h1 class="page-title" id="ltClientName">…</h1>
+    <p class="page-subtitle">
+      <span id="ltMobile" class="text-muted"></span>
+      <span class="hero-dot" aria-hidden="true">·</span>
+      <a id="ltBackLink" href="/marketing" class="text-link"
+         data-i18n="crm.timeline.back"></a>
+    </p>
+  </div>
+  <div class="hero-actions">
+    <a href="/marketing" class="btn btn-ghost">
+      <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+      <span data-i18n="common.back"></span>
+    </a>
+  </div>
+</section>
+
+<!-- 4 KPI tiles. Same primitives as the overview page so the per-lead
+     view feels like a "zoomed-in" overview rather than a different UI. -->
+<div class="stats-grid" style="margin-bottom:20px">
+  <div class="kpi-tile">
+    <span class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">history</span></span>
+    <span class="kpi-tile-label" data-i18n="crm.timeline.total_events"></span>
+    <span class="kpi-tile-value" id="ltTotalEvents">—</span>
+  </div>
+  <div class="kpi-tile">
+    <span class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">flag</span></span>
+    <span class="kpi-tile-label" data-i18n="crm.timeline.current_stage"></span>
+    <span class="kpi-tile-value" id="ltCurrentStage" style="font-size:18px">—</span>
+  </div>
+  <div class="kpi-tile">
+    <span class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">person</span></span>
+    <span class="kpi-tile-label" data-i18n="crm.timeline.current_rep"></span>
+    <span class="kpi-tile-value" id="ltCurrentRep" style="font-size:18px">—</span>
+  </div>
+  <div class="kpi-tile">
+    <span class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">warning</span></span>
+    <span class="kpi-tile-label" data-i18n="crm.timeline.risk_level"></span>
+    <span class="kpi-tile-value" id="ltRiskLevel" style="font-size:18px">—</span>
+  </div>
+</div>
+
+<!-- Intervention banner — populated only if the lead has an active flag. -->
+<div id="ltInterventionCard" class="glass-card lt-intervention-card" hidden>
+  <div class="lt-intervention-head">
+    <span class="lt-priority-pill" id="ltInterventionPriority"></span>
+    <div class="lt-intervention-trigger" id="ltInterventionTrigger"></div>
+    <span class="lt-intervention-status" id="ltInterventionStatus"></span>
+  </div>
+  <p class="lt-intervention-rec" id="ltInterventionRec"></p>
+  <div class="lt-intervention-actions" id="ltInterventionActions"></div>
+</div>
+
+<!-- Vertical timeline. Events render as cards on the trailing side of a
+     vertical rail; transfer events get an extra row above them flagging
+     the rep handoff. -->
+<div class="glass-card" style="padding:24px 28px;margin-top:18px" id="ltTimelineWrap" hidden>
+  <ol class="lt-timeline" id="ltTimelineList"></ol>
+</div>
+
+<!-- Empty/loading state -->
+<div id="ltEmpty" class="glass-card" style="padding:48px;text-align:center" hidden>
+  <span class="material-symbols-outlined" aria-hidden="true" style="font-size:48px;color:var(--text-dim)">history</span>
+  <h3 style="margin-top:12px" data-i18n="crm.timeline.no_events"></h3>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const LEAD_ID = {{ lead_id }};
+const CAMPAIGN_ID = {{ campaign_id }};
+let timelineData = null;
+
+const RISK_TOKENS = {
+  red:    { key: "crm.timeline.risk.red",    icon: "priority_high" },
+  orange: { key: "crm.timeline.risk.orange", icon: "warning" },
+  yellow: { key: "crm.timeline.risk.yellow", icon: "info" },
+};
+
+const STAGE_TOKENS = ["NO_ANSWER","FOLLOWING","MEETING","CANCELLATION","INTERESTED","REQUEST"];
+
+async function loadTimeline() {
+  try {
+    timelineData = await api(`/api/crm/leads/${LEAD_ID}/timeline`);
+    renderTimeline();
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+function renderTimeline() {
+  if (!timelineData) return;
+  const td = timelineData;
+
+  // Header bits
+  document.getElementById("ltClientName").textContent = td.client_name || "—";
+  document.getElementById("ltMobile").textContent = td.mobile || "";
+  // Back link goes to the campaign overview the lead belongs to. We use
+  // the server-supplied campaign_id (not the URL placeholder) so a stale
+  // URL still bounces to the right campaign.
+  const backHref = `/marketing/campaigns/${td.campaign_id || CAMPAIGN_ID}`;
+  document.getElementById("ltBackLink").href = backHref;
+
+  // KPI tiles
+  const totalEvents = (td.timeline || []).length;
+  document.getElementById("ltTotalEvents").textContent = fmtNum(totalEvents);
+  document.getElementById("ltCurrentStage").textContent = td.latest_stage
+    ? t("crm.stages." + td.latest_stage)
+    : "—";
+  document.getElementById("ltCurrentRep").textContent = td.current_sales_rep || "—";
+
+  // Risk level = worst risk across the timeline.
+  const worst = worstRisk(td.timeline || []);
+  const riskEl = document.getElementById("ltRiskLevel");
+  if (worst) {
+    riskEl.textContent = t(RISK_TOKENS[worst].key);
+    riskEl.dataset.risk = worst;
+  } else {
+    riskEl.textContent = "—";
+    delete riskEl.dataset.risk;
+  }
+
+  // Intervention banner
+  renderInterventionCard(td.intervention);
+
+  // Timeline list
+  renderTimelineList(td.timeline || []);
+}
+
+function worstRisk(events) {
+  // Order red > orange > yellow > none. Return first match in priority order.
+  let has = { red: false, orange: false, yellow: false };
+  events.forEach(e => { if (e.risk && has.hasOwnProperty(e.risk)) has[e.risk] = true; });
+  if (has.red) return "red";
+  if (has.orange) return "orange";
+  if (has.yellow) return "yellow";
+  return null;
+}
+
+function renderInterventionCard(iv) {
+  const card = document.getElementById("ltInterventionCard");
+  if (!iv) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  card.dataset.priority = iv.priority || "";
+  const pill = document.getElementById("ltInterventionPriority");
+  pill.textContent = t("crm.intervention.priority." + (iv.priority || "").toLowerCase());
+  pill.className = "lt-priority-pill " + (iv.priority === "HIGH" ? "is-high" : "is-medium");
+
+  document.getElementById("ltInterventionTrigger").textContent =
+    t("crm.intervention.trigger." + (iv.trigger || "").toLowerCase());
+  const statusEl = document.getElementById("ltInterventionStatus");
+  statusEl.textContent = t("crm.intervention.status." + (iv.status || "OPEN").toLowerCase());
+  statusEl.className = "lt-intervention-status status-" + (iv.status || "OPEN").toLowerCase();
+
+  // Recommended action — server returns the i18n key so we can localize.
+  document.getElementById("ltInterventionRec").textContent =
+    iv.recommendation_key ? t(iv.recommendation_key) : "";
+
+  // Action buttons — admin/manager only (server-side enforces too).
+  // Marketing role won't see the PATCH succeed even if they click; we
+  // still render the buttons for them since the API call is cheap to
+  // gate server-side and rendering role-specific UI here adds drift.
+  const actions = document.getElementById("ltInterventionActions");
+  actions.innerHTML = "";
+  const buttons = [];
+  if (iv.status !== "REVIEWED") buttons.push(["REVIEWED", "crm.intervention.action.mark_reviewed", "btn-ghost"]);
+  if (iv.status !== "CLOSED")   buttons.push(["CLOSED",   "crm.intervention.action.close",         "btn-primary"]);
+  if (iv.status !== "OPEN")     buttons.push(["OPEN",     "crm.intervention.action.reopen",        "btn-ghost"]);
+  buttons.forEach(([next, key, klass]) => {
+    const b = document.createElement("button");
+    b.className = "btn btn-sm " + klass;
+    b.setAttribute("data-i18n", key);
+    b.textContent = t(key);
+    b.addEventListener("click", () => setInterventionStatus(iv.id, next));
+    actions.appendChild(b);
+  });
+}
+
+async function setInterventionStatus(flagId, status) {
+  try {
+    await api(`/api/crm/intervention/${flagId}`, { method: "PATCH", body: { status } });
+    toast(t("common.saved"), "success");
+    await loadTimeline();
+    // Refresh the sidebar badge — the open-count just shifted.
+    if (typeof refreshInterventionBadge === "function") refreshInterventionBadge();
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+function renderTimelineList(events) {
+  const wrap = document.getElementById("ltTimelineWrap");
+  const list = document.getElementById("ltTimelineList");
+  const empty = document.getElementById("ltEmpty");
+  if (!events.length) {
+    wrap.hidden = true;
+    empty.hidden = false;
+    return;
+  }
+  empty.hidden = true;
+  wrap.hidden = false;
+  list.innerHTML = "";
+
+  events.forEach((ev, idx) => {
+    // Transfer event — small row above the actual event marker showing
+    // the handoff. We use the prior rep name (from the previous event)
+    // for the "from" side.
+    if (ev.is_transfer && idx > 0) {
+      const prev = events[idx - 1];
+      const transferLi = document.createElement("li");
+      transferLi.className = "lt-step lt-step-transfer";
+      transferLi.innerHTML = `
+        <span class="lt-dot lt-dot-transfer" aria-hidden="true">
+          <span class="material-symbols-outlined">swap_horiz</span>
+        </span>
+        <div class="lt-transfer-text">
+          ${escapeHtml(t("crm.timeline.transfer_to").replace("{rep}", ev.sales_rep || "—"))}
+          <span class="text-muted"> · ${escapeHtml(prev.sales_rep || "")} → ${escapeHtml(ev.sales_rep || "")}</span>
+        </div>
+      `;
+      list.appendChild(transferLi);
+    }
+
+    const li = document.createElement("li");
+    li.className = "lt-step";
+    if (ev.risk) li.dataset.risk = ev.risk;
+
+    const riskBadgeHtml = ev.risk ? `
+      <span class="lt-risk-badge lt-risk-${ev.risk}" aria-hidden="true">
+        <span class="material-symbols-outlined">${RISK_TOKENS[ev.risk].icon}</span>
+      </span>` : "";
+
+    const assignTypeHtml = ev.assignment_type ? `
+      <span class="lt-assignment-badge lt-assignment-${ev.assignment_type.toLowerCase()}">
+        ${ev.assignment_type === "FRESH"
+          ? escapeHtml(t("crm.sales.fresh_leads"))
+          : escapeHtml(t("crm.sales.rotation_leads"))}
+      </span>` : "";
+
+    const stageHtml = ev.stage ? `
+      <span class="outcome-chip outcome-${ev.stage.toLowerCase()}">${escapeHtml(t("crm.stages." + ev.stage))}</span>` : `
+      <span class="outcome-chip">${escapeHtml(ev.raw_stage || "—")}</span>`;
+
+    li.innerHTML = `
+      <span class="lt-dot ${ev.risk ? "lt-dot-" + ev.risk : ""}"></span>
+      <div class="lt-event-card">
+        <div class="lt-event-head">
+          <span class="lt-event-date">${escapeHtml(fmtDateTimeShort(ev.date))}</span>
+          ${assignTypeHtml}
+          ${stageHtml}
+          ${riskBadgeHtml}
+        </div>
+        <div class="lt-event-rep">
+          ${avatarHtml(ev)}
+          <span>${escapeHtml(ev.sales_rep || "—")}</span>
+        </div>
+        ${ev.comment ? `<div class="lt-event-comment">${escapeHtml(ev.comment)}</div>` : ""}
+      </div>
+    `;
+    list.appendChild(li);
+  });
+}
+
+function avatarHtml(ev) {
+  if (ev.avatar_url) {
+    return `<span class="sales-avatar"><img src="${escapeHtml(ev.avatar_url)}" alt=""></span>`;
+  }
+  const initial = (ev.sales_rep || "?").trim().charAt(0).toUpperCase() || "?";
+  return `<span class="sales-avatar sales-avatar-initial">${escapeHtml(initial)}</span>`;
+}
+
+// Local helpers — these mirror the ones in marketing_campaign.html. Kept
+// page-local so common.js doesn't grow a CRM-specific surface area.
+function fmtNum(n) {
+  if (n == null) return "—";
+  try { return Number(n).toLocaleString(); } catch (_) { return String(n); }
+}
+function fmtDateTimeShort(iso) {
+  if (!iso) return "—";
+  try {
+    return new Intl.DateTimeFormat(getLang() === "ar" ? "ar-EG" : "en-GB",
+      { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }
+    ).format(new Date(iso));
+  } catch (_) { return iso; }
+}
+function escapeHtml(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function onLangChange() { if (timelineData) renderTimeline(); }
+
+loadTimeline();
+</script>
+
+<style>
+  .hero-dot { margin: 0 6px; color: var(--text-dim); }
+  .hero-actions { display: flex; gap: 8px; }
+  .text-link { color: var(--brand); text-decoration: none; font-weight: 600; font-size: 13px; }
+  .text-link:hover { text-decoration: underline; }
+
+  /* Intervention banner */
+  .lt-intervention-card {
+    padding: 18px 22px;
+    border-inline-start: 4px solid var(--warning);
+    background: rgba(196,114,0,0.05);
+    margin-top: 18px;
+  }
+  .lt-intervention-card[data-priority="HIGH"] {
+    border-inline-start-color: var(--danger);
+    background: rgba(186,26,26,0.05);
+  }
+  .lt-intervention-head {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .lt-priority-pill {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+    padding: 4px 12px; border-radius: 9999px; text-transform: uppercase;
+  }
+  .lt-priority-pill.is-high   { background: rgba(186,26,26,0.10); color: var(--danger); }
+  .lt-priority-pill.is-medium { background: rgba(196,114,0,0.12); color: var(--warning); }
+  .lt-intervention-trigger { font-weight: 600; color: var(--text); flex: 1; min-width: 0; }
+  .lt-intervention-status {
+    font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 9999px;
+    background: var(--surface-recessed); color: var(--text-muted);
+  }
+  .lt-intervention-status.status-open     { background: rgba(186,26,26,0.10); color: var(--danger); }
+  .lt-intervention-status.status-reviewed { background: rgba(196,114,0,0.12); color: var(--warning); }
+  .lt-intervention-status.status-closed   { background: rgba(0,103,98,0.10); color: var(--accent-2); }
+  .lt-intervention-rec { color: var(--text-muted); font-size: 14px; line-height: 1.6; margin: 0 0 14px; }
+  .lt-intervention-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* Vertical timeline stepper */
+  .lt-timeline { list-style: none; margin: 0; padding: 0; position: relative; }
+  .lt-timeline::before {
+    content: ""; position: absolute; top: 8px; bottom: 8px;
+    inset-inline-start: 14px;
+    width: 2px; background: var(--border);
+  }
+  .lt-step {
+    position: relative;
+    padding-inline-start: 44px;
+    padding-block: 10px 18px;
+  }
+  .lt-step:last-child { padding-bottom: 0; }
+  .lt-dot {
+    position: absolute;
+    top: 14px; inset-inline-start: 6px;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--surface);
+    border: 3px solid var(--brand);
+    z-index: 1;
+  }
+  .lt-dot-red    { border-color: var(--danger); }
+  .lt-dot-orange { border-color: var(--warning); }
+  .lt-dot-yellow { border-color: #c7a300; }
+
+  .lt-step-transfer { padding-block: 4px 4px; min-height: 22px; }
+  .lt-dot-transfer {
+    width: 28px; height: 28px;
+    inset-inline-start: 0;
+    top: 0;
+    background: var(--surface-recessed);
+    border: 2px dashed var(--text-dim);
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-muted);
+  }
+  .lt-dot-transfer .material-symbols-outlined { font-size: 16px; }
+  .lt-transfer-text {
+    font-size: 12px; color: var(--text-muted);
+    padding-inline-start: 8px;
+    padding-block: 6px;
+  }
+
+  .lt-event-card {
+    background: var(--surface-recessed);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+  }
+  .lt-event-head {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .lt-event-date { font-weight: 600; color: var(--text); font-size: 13px; }
+  .lt-assignment-badge {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+    padding: 2px 8px; border-radius: 9999px;
+    text-transform: uppercase;
+  }
+  .lt-assignment-badge.lt-assignment-fresh    { background: var(--brand-soft); color: var(--brand); }
+  .lt-assignment-badge.lt-assignment-rotation { background: rgba(196,114,0,0.10); color: var(--warning); }
+  .lt-risk-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--surface);
+  }
+  .lt-risk-badge .material-symbols-outlined { font-size: 14px; }
+  .lt-risk-badge.lt-risk-red    { background: rgba(186,26,26,0.12); color: var(--danger); }
+  .lt-risk-badge.lt-risk-orange { background: rgba(196,114,0,0.14); color: var(--warning); }
+  .lt-risk-badge.lt-risk-yellow { background: rgba(199,163,0,0.14); color: #c7a300; }
+  .lt-event-rep { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+  .lt-event-comment { font-size: 14px; color: var(--text); line-height: 1.6; }
+
+  /* Reused from marketing_campaign.html — kept page-local rather than
+     migrated to common CSS until we have a 3rd consumer. */
+  .sales-avatar {
+    width: 24px; height: 24px; border-radius: 50%;
+    overflow: hidden; display: inline-flex;
+    align-items: center; justify-content: center;
+    background: var(--surface);
+    font-size: 11px; font-weight: 700; color: var(--text-muted);
+    flex-shrink: 0;
+  }
+  .sales-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .sales-avatar-initial { background: var(--brand-soft); color: var(--brand); }
+
+  .outcome-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 9999px;
+    font-size: 11px; font-weight: 500;
+    background: var(--surface-recessed); border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  .outcome-chip.outcome-no_answer    { background: rgba(196,114,0,0.10); border-color: rgba(196,114,0,0.20); color: var(--warning); }
+  .outcome-chip.outcome-following    { background: var(--brand-soft); border-color: rgba(71,77,197,0.18); color: var(--brand); }
+  .outcome-chip.outcome-meeting      { background: rgba(0,103,98,0.10); border-color: rgba(0,103,98,0.22); color: var(--accent-2); }
+  .outcome-chip.outcome-cancellation { background: rgba(186,26,26,0.08); border-color: rgba(186,26,26,0.20); color: var(--danger); }
+  .outcome-chip.outcome-interested   { background: rgba(64,220,209,0.14); border-color: rgba(64,220,209,0.28); color: var(--accent-2); }
+  .outcome-chip.outcome-request      { background: rgba(124,131,253,0.10); border-color: rgba(124,131,253,0.22); color: var(--brand); }
+</style>
+{% endblock %}

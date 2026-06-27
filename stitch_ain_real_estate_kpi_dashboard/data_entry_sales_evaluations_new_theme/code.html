@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-low": "#f1f3ff",
+                    "on-tertiary-container": "#f3fffd",
+                    "on-surface-variant": "#464653",
+                    "secondary": "#884f41",
+                    "primary-container": "#6067df",
+                    "surface-container": "#ebedfa",
+                    "surface-container-high": "#e5e7f4",
+                    "on-error": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "primary-fixed-dim": "#bfc2ff",
+                    "on-tertiary": "#ffffff",
+                    "tertiary-fixed": "#65f8ed",
+                    "surface-bright": "#faf9ff",
+                    "surface-tint": "#4950c7",
+                    "surface-container-lowest": "#ffffff",
+                    "on-primary-container": "#fffbff",
+                    "on-secondary": "#ffffff",
+                    "primary-fixed": "#e0e0ff",
+                    "outline-variant": "#c6c5d6",
+                    "on-primary": "#ffffff",
+                    "on-primary-fixed": "#02006d",
+                    "error": "#ba1a1a",
+                    "inverse-surface": "#2d303a",
+                    "surface-dim": "#d7d9e6",
+                    "error-container": "#ffdad6",
+                    "secondary-fixed-dim": "#ffb4a2",
+                    "on-secondary-container": "#7a4336",
+                    "primary": "#474dc5",
+                    "tertiary-container": "#00837c",
+                    "inverse-primary": "#bfc2ff",
+                    "secondary-fixed": "#ffdad2",
+                    "secondary-container": "#ffb4a2",
+                    "surface-variant": "#e0e2ef",
+                    "tertiary-fixed-dim": "#40dcd1",
+                    "on-tertiary-fixed-variant": "#00504b",
+                    "on-surface": "#181b24",
+                    "on-primary-fixed-variant": "#3035af",
+                    "background": "#faf9ff",
+                    "outline": "#767685",
+                    "on-secondary-fixed": "#360e05",
+                    "on-secondary-fixed-variant": "#6c382b",
+                    "surface": "#faf9ff",
+                    "tertiary": "#006762",
+                    "on-tertiary-fixed": "#00201e",
+                    "inverse-on-surface": "#eef0fd",
+                    "surface-container-highest": "#e0e2ef",
+                    "on-background": "#181b24"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "card-padding": "20px",
+                    "unit": "4px",
+                    "gutter": "24px",
+                    "container-margin": "32px",
+                    "element-gap": "12px"
+            },
+            "fontFamily": {
+                    "body-lg": ["Inter"],
+                    "label-caps": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "headline-xl": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "data-num": ["Inter"]
+            },
+            "fontSize": {
+                    "body-lg": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "body-sm": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "headline-xl": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-md": ["20px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                    "data-num": ["24px", {"lineHeight": "1", "letterSpacing": "-0.01em", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(24px);
+            border-top: 1px solid rgba(255, 255, 255, 0.4);
+            border-left: 1px solid rgba(255, 255, 255, 0.4);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23767685' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-lg min-h-screen">
+<!-- TopNavBar Shell -->
+<nav class="bg-white/70 backdrop-blur-xl text-indigo-500 font-sans tracking-tight text-sm font-medium docked full-width top-0 sticky z-50 border-b border-white/40 shadow-[0_10px_30px_rgba(124,131,253,0.1)] flex justify-between items-center px-8 h-16 w-full max-w-[1920px] mx-auto">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold tracking-tighter text-indigo-600 dark:text-indigo-300">Ain Real Estate</span>
+<div class="hidden md:flex items-center gap-6">
+<a class="text-slate-500 dark:text-slate-400 hover:text-indigo-400 transition-colors" href="#">Dashboard</a>
+<a class="text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500 pb-1" href="#">Evaluation</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-indigo-400 transition-colors" href="#">Finance</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-indigo-400 transition-colors" href="#">Users</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-indigo-400 transition-colors" href="#">PropFinder</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 hover:bg-white/20 transition-all duration-300 rounded-full">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 hover:bg-white/20 transition-all duration-300 rounded-full">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="h-8 w-8 rounded-full overflow-hidden border border-primary/20">
+<img alt="User profile avatar" data-alt="close-up portrait of a professional woman with a friendly smile in a bright modern office setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuATOZXLmoiUS3OAT05DLmYEMiKVKNFXcN9UFeOwJrOfj-mTUCN6hsifFZkYJsqYcDMjPnix1aFHmQ899ANlNXF9cwvRIkMkpLGxfNIONs3bzIVj15tGqNCuo3XlTOZMM9PVsZVwZ4lKlFIXzEGhxaX5cWm9XVu0EOwwkmO0KsRtUFNKou5e30Y6qP0r6lkzmQsq0AusjmDb1QCvgBs0eMpE_uA7QD2q29J6gqCD2OYA-8D26nRmFZC0d-qiLe-TDU_JRLWPf7M7H6IX"/>
+</div>
+</div>
+</nav>
+<main class="max-w-[1440px] mx-auto p-container-margin">
+<!-- Header Section -->
+<header class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-gutter">
+<div>
+<h1 class="font-headline-xl text-headline-xl text-primary mb-2">Performance Assessment</h1>
+<p class="text-on-surface-variant font-body-sm">Soft skills and cultural alignment check for the sales division.</p>
+</div>
+<div class="flex items-center gap-4">
+<!-- Month Picker -->
+<div class="glass-card flex items-center gap-3 px-4 py-2 rounded-xl shadow-sm">
+<span class="material-symbols-outlined text-primary" data-icon="calendar_month">calendar_month</span>
+<select class="bg-transparent border-none focus:ring-0 font-label-caps text-on-surface cursor-pointer pr-8">
+<option>OCTOBER 2023</option>
+<option>NOVEMBER 2023</option>
+<option selected="">DECEMBER 2023</option>
+</select>
+</div>
+<!-- Status Indicator -->
+<div class="glass-card flex items-center gap-3 px-5 py-2 rounded-xl shadow-sm border-l-4 border-l-tertiary-fixed">
+<div class="flex flex-col">
+<span class="text-[10px] font-bold text-outline uppercase tracking-widest">Progress</span>
+<span class="font-data-num text-headline-md text-tertiary">5 <span class="text-sm font-medium text-outline">of 8</span></span>
+</div>
+<div class="w-12 h-12 relative flex items-center justify-center">
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-surface-container-high" cx="24" cy="24" fill="transparent" r="20" stroke="currentColor" stroke-width="4"></circle>
+<circle class="text-tertiary transition-all duration-500" cx="24" cy="24" fill="transparent" r="20" stroke="currentColor" stroke-dasharray="125.6" stroke-dashoffset="47.1" stroke-width="4"></circle>
+</svg>
+</div>
+</div>
+</div>
+</header>
+<!-- Evaluation Cards Stack -->
+<div class="flex flex-col gap-gutter">
+<!-- Rep Card 1 (Completed) -->
+<div class="glass-card rounded-3xl p-card-padding shadow-[0_10px_30px_rgba(124,131,253,0.05)] transition-all hover:translate-y-[-2px] hover:shadow-indigo-500/10">
+<div class="flex flex-col lg:flex-row gap-6">
+<!-- Left: Profile Info -->
+<div class="flex items-center gap-4 lg:w-1/4 border-b lg:border-b-0 lg:border-r border-outline-variant/30 pb-4 lg:pb-0 lg:pr-6">
+<div class="relative">
+<img alt="Rep Avatar" class="w-16 h-16 rounded-2xl object-cover border-2 border-white" data-alt="professional headshot of a young man with glasses and a light blue shirt smiling confidently" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCZD4FxMjhPBCz7oZHKIPPQ3m06yDm268K-jnF4dEu9ZtcPnCfxscMd7-NtEVV_MbDz57ueYSrxFqpv5UM91QfQcTCo4yOc2ktTj7e6eswz2Ldr2BiTvG79jVcTtjS0tVD25WZsL95XVMrgnEO_XFkSDrhM6Ls9_-O5MgxfGAMJRnaCjqLnClUz9KiMXOtyf56A6eXN10EBP7FegtDG3DDppI6AtdI2QOm38xRY3uzba4XwWzJ-Jkx_aA_2WAPyl4xKm-5Rde08mATI"/>
+<div class="absolute -bottom-1 -right-1 bg-tertiary text-white rounded-full p-1 border-2 border-white">
+<span class="material-symbols-outlined text-[14px] block" data-icon="check" data-weight="fill">check</span>
+</div>
+</div>
+<div>
+<h3 class="font-headline-md text-on-surface">Alex Morgan</h3>
+<span class="text-body-sm text-outline">Senior Sales Consultant</span>
+<div class="mt-2 inline-flex items-center px-2 py-0.5 bg-tertiary-fixed/20 text-tertiary text-[10px] font-bold rounded-full uppercase tracking-tight">Evaluated</div>
+</div>
+</div>
+<!-- Middle: Skills Data Entry -->
+<div class="flex-1 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-element-gap">
+<div class="flex flex-col gap-1">
+<label class="font-label-caps text-outline uppercase">Attitude</label>
+<select class="glass-card rounded-xl border-none text-body-sm py-2 px-3 focus:ring-2 focus:ring-primary/30 transition-all">
+<option>Select Status</option>
+<option selected="">Pass</option>
+<option>Needs Work</option>
+<option>Fail</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-caps text-outline uppercase">Presentation</label>
+<select class="glass-card rounded-xl border-none text-body-sm py-2 px-3 focus:ring-2 focus:ring-primary/30 transition-all">
+<option>Select Status</option>
+<option selected="">Pass</option>
+<option>Needs Work</option>
+<option>Fail</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-caps text-outline uppercase">Communication</label>
+<select class="glass-card rounded-xl border-none text-body-sm py-2 px-3 focus:ring-2 focus:ring-primary/30 transition-all">
+<option>Select Status</option>
+<option selected="">Pass</option>
+<option>Needs Work</option>
+<option>Fail</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-caps text-outline uppercase">Objection Handling</label>
+<select class="glass-card rounded-xl border-none text-body-sm py-2 px-3 focus:ring-2 focus:ring-primary/30 transition-all">
+<option>Select Status</option>
+<option>Pass</option>
+<option selected="">Needs Work</option>
+<option>Fail</option>
+</select>
+</div>
+</div>
+<!-- Right: Notes -->
+<div class="lg:w-1/3">
+<label class="font-label-caps text-outline uppercase block mb-1">Feedback Notes</label>
+<textarea class="w-full glass-card border-none rounded-xl text-body-sm p-3 focus:ring-2 focus:ring-primary/30 min-h-[80px] resize-none" placeholder="Add specific observational notes...">Excellent rapport building this month. Needs to sharpen the closing sequence during luxury property walk-throughs.</textarea>
+</div>
+</div>
+</div>
+<!-- Rep Card 2 (Pending) -->
+<div class="glass-card rounded-3xl p-card-padding shadow-[0_10px_30px_rgba(124,131,253,0.05)] transition-all hover:translate-y-[-2px] hover:shadow-indigo-500/10">
+<div class="flex flex-col lg:flex-row gap-6">
+<!-- Left: Profile Info -->
+<div class="flex items-center gap-4 lg:w-1/4 border-b lg:border-b-0 lg:border-r border-outline-variant/30 pb-4 lg:pb-0 lg:pr-6">
+<div class="relative">
+<img alt="Rep Avatar" class="w-16 h-16 rounded-2xl object-cover border-2 border-white" data-alt="headshot of a stylish middle-aged woman with a warm expression in a sunlit airy boardroom" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBMg3KyjybKwQMCtOVUUU6gkcWbUMfAwFO7YKTKiYRXHVZonT2uQPGdaLWpFc2ayBwa3Xoie6qKkYlQ49iPPwSkfZAW34-bJNoKl6feSf3MfVKCnKB0VUoFgXIxzq8Ps9d-QXvM6bu3fxtDKQY6abz4MuuLUdOfEPM_mAA9UlhdmsqbmJRmqk3oWT6DZ1b9PwBwgiMQ68LKGtrOKV5GZ9SXDPi2O3SrZ4vxcrfDSNlY17tNqotVUKvGz0KM_XphniOjAmu8R7HKeKHv"/>
+<div class="absolute -bottom-1 -right-1 bg-secondary-container text-on-secondary-container rounded-full p-1 border-2 border-white">
+<span class="material-symbols-outlined text-[14px] block" data-icon="schedule" data-weight="fill">schedule</span>
+</div>
+</div>
+<div>
+<h3 class="font-headline-md text-on-surface">Sarah Williams</h3>
+<span class="text-body-sm text-outline">Junior Associate</span>
+<div class="mt-2 inline-flex items-center px-2 py-0.5 bg-surface-container-highest text-outline text-[10px] font-bold rounded-full uppercase tracking-tight">Pending</div>
+</div>
+</div>
+<!-- Middle: Skills Data Entry -->
+<div class="flex-1 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-element-gap">
+<div class="flex flex-col gap-1">
+<label class="font-label-caps text-outline uppercase">Attitude</label>
+<select class="glass-card rounded-xl border-none text-body-sm py-2 px-3 focus:ring-2 focus:ring-primary/30 transition-all">
+<option selected="">Select Status</option>
+<option>Pass</option>
+<option>Needs Work</option>
+<option>Fail</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-caps text-outline uppercase">Presentation</label>
+<select class="glass-card rounded-xl border-none text-body-sm py-2 px-3 focus:ring-2 focus:ring-primary/30 transition-all">
+<option selected="">Select Status</option>
+<option>Pass</option>
+<option>Needs Work</option>
+<option>Fail</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-caps text-outline uppercase">Communication</label>
+<select class="glass-card rounded-xl border-none text-body-sm py-2 px-3 focus:ring-2 focus:ring-primary/30 transition-all">
+<option selected="">Select Status</option>
+<option>Pass</option>
+<option>Needs Work</option>
+<option>Fail</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-caps text-outline uppercase">Objection Handling</label>
+<select class="glass-card rounded-xl border-none text-body-sm py-2 px-3 focus:ring-2 focus:ring-primary/30 transition-all">
+<option selected="">Select Status</option>
+<option>Pass</option>
+<option>Needs Work</option>
+<option>Fail</option>
+</select>
+</div>
+</div>
+<!-- Right: Notes -->
+<div class="lg:w-1/3">
+<label class="font-label-caps text-outline uppercase block mb-1">Feedback Notes</label>
+<textarea class="w-full glass-card border-none rounded-xl text-body-sm p-3 focus:ring-2 focus:ring-primary/30 min-h-[80px] resize-none" placeholder="Add specific observational notes..."></textarea>
+</div>
+</div>
+</div>
+<!-- Rep Card 3 (In Progress) -->
+<div class="glass-card rounded-3xl p-card-padding shadow-[0_10px_30px_rgba(124,131,253,0.05)] transition-all hover:translate-y-[-2px] hover:shadow-indigo-500/10 border-l-4 border-l-primary">
+<div class="flex flex-col lg:flex-row gap-6">
+<!-- Left: Profile Info -->
+<div class="flex items-center gap-4 lg:w-1/4 border-b lg:border-b-0 lg:border-r border-outline-variant/30 pb-4 lg:pb-0 lg:pr-6">
+<div class="relative">
+<img alt="Rep Avatar" class="w-16 h-16 rounded-2xl object-cover border-2 border-white" data-alt="headshot of an energetic man in his 30s with short hair and a navy polo shirt, background features a bright glass-walled office" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA0icoh0AfBrQUeSgfHYHScI3s0yxJY3BHXj93xIgxuTfMuaRoUIwHE9pc9ulEwwjzzYtQttN3vbPZ9Ky4_mAsDY3B33HgQNGxMVUFSQxkQn1-nb712L-sIKNcSorK7jVlwnf3I8-lOiOb3u9tVH1lT3YANzh4pJ6tvVBDMrfw2PXlTgWVVE3vJQ0pbP1bz2Ptmw4JokYa8SSsMIrcXoAQMXBkmdb5F2gUg8WZjkV6Pf6EakcGnvSee6gjgiGfIToMsLFTF0EYX8LfV"/>
+<div class="absolute -bottom-1 -right-1 bg-primary text-white rounded-full p-1 border-2 border-white">
+<span class="material-symbols-outlined text-[14px] block" data-icon="edit_note" data-weight="fill">edit_note</span>
+</div>
+</div>
+<div>
+<h3 class="font-headline-md text-on-surface">Jordan Lee</h3>
+<span class="text-body-sm text-outline">Real Estate Specialist</span>
+<div class="mt-2 inline-flex items-center px-2 py-0.5 bg-primary-fixed text-on-primary-fixed-variant text-[10px] font-bold rounded-full uppercase tracking-tight">Active Entry</div>
+</div>
+</div>
+<!-- Middle: Skills Data Entry -->
+<div class="flex-1 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-element-gap">
+<div class="flex flex-col gap-1">
+<label class="font-label-caps text-outline uppercase">Attitude</label>
+<select class="glass-card rounded-xl border-none text-body-sm py-2 px-3 focus:ring-2 focus:ring-primary/30 transition-all">
+<option>Select Status</option>
+<option selected="">Pass</option>
+<option>Needs Work</option>
+<option>Fail</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-caps text-outline uppercase">Presentation</label>
+<select class="glass-card rounded-xl border-none text-body-sm py-2 px-3 focus:ring-2 focus:ring-primary/30 transition-all">
+<option>Select Status</option>
+<option selected="">Pass</option>
+<option>Needs Work</option>
+<option>Fail</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-caps text-outline uppercase">Communication</label>
+<select class="glass-card rounded-xl border-none text-body-sm py-2 px-3 focus:ring-2 focus:ring-primary/30 transition-all">
+<option selected="">Select Status</option>
+<option>Pass</option>
+<option>Needs Work</option>
+<option>Fail</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-caps text-outline uppercase">Objection Handling</label>
+<select class="glass-card rounded-xl border-none text-body-sm py-2 px-3 focus:ring-2 focus:ring-primary/30 transition-all">
+<option selected="">Select Status</option>
+<option>Pass</option>
+<option>Needs Work</option>
+<option>Fail</option>
+</select>
+</div>
+</div>
+<!-- Right: Notes -->
+<div class="lg:w-1/3">
+<label class="font-label-caps text-outline uppercase block mb-1">Feedback Notes</label>
+<textarea class="w-full glass-card border-none rounded-xl text-body-sm p-3 focus:ring-2 focus:ring-primary/30 min-h-[80px] resize-none" placeholder="Add specific observational notes...">Jordan showed great energy in the group pitch session today.</textarea>
+</div>
+</div>
+</div>
+</div>
+<!-- Action Bar -->
+<div class="mt-gutter flex justify-end items-center gap-4">
+<button class="px-6 py-3 rounded-2xl font-label-caps text-primary bg-white/50 border border-primary/20 hover:bg-white/80 transition-all">Save Draft</button>
+<button class="px-8 py-3 rounded-2xl font-label-caps text-white bg-gradient-to-r from-primary to-primary-container shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all">Submit Evaluations</button>
+</div>
+</main>
+<!-- SideNavBar (Contextual Hidden on Mobile/Header Focus) -->
+<aside class="hidden xl:flex flex-col p-4 gap-2 h-screen w-64 fixed left-0 top-0 bg-white/60 backdrop-blur-2xl border-r border-white/30 shadow-xl shadow-indigo-500/5 z-40 pt-20">
+<div class="mb-8 px-4">
+<span class="text-lg font-black text-indigo-700 block">Ain Management</span>
+<span class="text-xs font-semibold text-slate-400">Premium Assets</span>
+</div>
+<nav class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-500 hover:bg-white/40 hover:translate-x-1 transition-transform duration-200 rounded-xl font-sans text-sm font-semibold" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span> Overview
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-500 hover:bg-white/40 hover:translate-x-1 transition-transform duration-200 rounded-xl font-sans text-sm font-semibold" href="#">
+<span class="material-symbols-outlined" data-icon="domain">domain</span> Portfolio
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-500 hover:bg-white/40 hover:translate-x-1 transition-transform duration-200 rounded-xl font-sans text-sm font-semibold" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span> Transactions
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-500 hover:bg-white/40 hover:translate-x-1 transition-transform duration-200 rounded-xl font-sans text-sm font-semibold" href="#">
+<span class="material-symbols-outlined" data-icon="query_stats">query_stats</span> Market Analysis
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 bg-indigo-50/50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 rounded-xl font-sans text-sm font-semibold" href="#">
+<span class="material-symbols-outlined" data-icon="description">description</span> Reports
+            </a>
+</nav>
+<div class="mt-auto flex flex-col gap-1 border-t border-white/30 pt-4">
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-white/40 transition-all rounded-xl font-sans text-sm font-semibold" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span> Support
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-white/40 transition-all rounded-xl font-sans text-sm font-semibold" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span> Logout
+            </a>
+</div>
+</aside>
+</body></html>

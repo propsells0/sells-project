@@ -1,0 +1,863 @@
+{% extends "base.html" %}
+{% block title %}Ain KPI{% endblock %}
+
+{% block head %}
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title" data-i18n="de.title"></h1>
+    <p class="page-subtitle">
+      <span data-i18n="de.subtitle_full"></span>
+      <span class="kbd-hint">·  <kbd>Ctrl</kbd>+<kbd>Enter</kbd> <span data-i18n="de.shortcut_hint"></span></span>
+    </p>
+  </div>
+  <button class="btn btn-primary" onclick="openNewEvalModal()">
+    <span class="material-symbols-outlined" aria-hidden="true">add</span>
+    <span data-i18n="de.new_evaluation"></span>
+  </button>
+</div>
+
+<!-- Progress tiles -->
+<div class="bento" id="deTiles">
+  <div class="kpi-tile tile-brand span-3"><div class="kpi-tile-head">
+    <div class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">groups</span></div><div class="kpi-tile-label" data-i18n="de.team_size"></div>
+  </div><div class="kpi-tile-value" id="tile_total">—</div></div>
+
+  <div class="kpi-tile tile-accent span-3"><div class="kpi-tile-head">
+    <div class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">check_circle</span></div><div class="kpi-tile-label" data-i18n="de.evaluated"></div>
+  </div><div class="kpi-tile-value" id="tile_done">—</div><div class="kpi-tile-sub" id="tile_done_sub">&nbsp;</div></div>
+
+  <div class="kpi-tile tile-warm span-3 is-clickable" id="detile_pending" data-i18n-aria-label="dash.tile_action_pending_eval" tabindex="0" role="button">
+    <div class="kpi-tile-head">
+      <div class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">hourglass_empty</span></div>
+      <div class="kpi-tile-label" data-i18n="de.waiting_eval"></div>
+    </div>
+    <div class="kpi-tile-value" id="tile_pending">—</div>
+  </div>
+
+  <div class="kpi-tile tile-coral span-3"><div class="kpi-tile-head">
+    <div class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">inbox</span></div><div class="kpi-tile-label" data-i18n="de.missing_sales"></div>
+  </div><div class="kpi-tile-value" id="tile_missing">—</div></div>
+</div>
+
+<!-- Status chart row -->
+<div class="bento">
+  <div class="chart-card span-4">
+    <h3 data-i18n="dash.chart_status_split"></h3>
+    <div id="chartProgress" class="plotly-container short"></div>
+  </div>
+  <div class="chart-card span-8">
+    <h3 data-i18n="dash.chart_leaderboard"></h3>
+    <div id="chartScores" class="plotly-container short"></div>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="field">
+    <label data-i18n="common.month"></label>
+    <div id="dateRangeHost"></div>
+  </div>
+  <div class="field">
+    <label data-i18n="common.filter"></label>
+    <select id="filterStatus" onchange="applyFilters()">
+      <option value="all" data-i18n="de.all_team"></option>
+      <option value="pending" data-i18n="de.waiting_eval"></option>
+      <option value="done" data-i18n="de.evaluated"></option>
+      <option value="no-sales" data-i18n="de.missing_sales"></option>
+      <option value="mine" data-i18n="de.my_submissions"></option>
+    </select>
+  </div>
+  <div class="field">
+    <label data-i18n="filters.team"></label>
+    <select id="teamFilter" onchange="applyFilters()">
+      <option value="" data-i18n="common.all"></option>
+      <option value="none" data-i18n="filters.no_team"></option>
+    </select>
+  </div>
+  <div class="field" style="flex:1;min-width:180px">
+    <label for="searchBox" data-i18n="common.search"></label>
+    <div class="pf-search-input-wrap">
+      <span class="material-symbols-outlined pf-search-icon" aria-hidden="true">search</span>
+      <input type="text" id="searchBox" oninput="onSearchInput()" data-i18n-placeholder="filters.search_user_ph">
+      <button type="button" class="pf-search-clear" id="deSearchClear" onclick="clearSearchBox()" data-i18n-aria-label="common.clear" hidden>
+        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+      </button>
+    </div>
+  </div>
+  <div class="field" style="align-self:flex-end">
+    <button class="btn btn-ghost btn-sm" onclick="resetFilters()" data-i18n="filters.reset"></button>
+  </div>
+  <div class="spacer"></div>
+  <div id="progress" class="text-muted" style="font-size:13px;font-weight:600"></div>
+</div>
+
+<div id="chipsRow" class="pf-chips" style="margin-bottom:12px"></div>
+
+<div id="list"></div>
+
+<!-- New Evaluation modal — quick-pick a rep + month, then scrolls to that
+     rep's card and focuses the first input. (DE-05/06) -->
+<div class="modal-backdrop" id="newEvalModal" role="dialog" aria-modal="true" aria-labelledby="newEvalTitle">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title" id="newEvalTitle" data-i18n="de.new_evaluation"></div>
+      <button class="modal-close" onclick="closeModal('newEvalModal')" data-i18n-aria-label="common.close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-muted" style="font-size:13px;margin-top:0" data-i18n="de.new_evaluation_hint"></p>
+      <div class="field">
+        <label for="neRep" data-i18n="de.pick_rep"></label>
+        <select id="neRep">
+          <option value="" data-i18n="de.pick_rep_placeholder"></option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="neMonth" data-i18n="common.month"></label>
+        <input type="month" id="neMonth">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="startNewEvaluation()" data-i18n="de.start_evaluation"></button>
+      <button class="btn btn-ghost" onclick="closeModal('newEvalModal')" data-i18n="common.cancel"></button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}?v=flat51"></script>
+<script src="{{ url_for('static', filename='js/date_range.js') }}?v=flat51"></script>
+<script>
+let users = [];
+let entries = {};
+let teams = [];
+let kpiConfig = null;  // Loaded once from /api/kpi/config; powers live score preview + soft validation.
+let _drCtrl = null;
+// Auto-widen to YTD if the default (last_30) returns no entries on first paint.
+let _drFallbackArmed = true;
+
+// Snapshot the current user's id so the "mine" filter can match
+// entries.dataentry_by === me. Pulled via |tojson so a null surfaces as null.
+const CURRENT_USER_ID = {{ user.id|tojson }};
+const NUMERIC = ["fresh_leads", "calls", "meetings", "crm_pct", "deals",
+                 "reports", "reservations", "followup_pct", "attendance_pct"];
+const PASSFAIL = ["attitude", "presentation", "behaviour", "appearance", "hr_roles"];
+const PCT_FIELDS = new Set(["crm_pct", "followup_pct", "attendance_pct"]);
+
+// Soft upper bounds — typo guards. Server has no enforcement; these only warn.
+// Calls target is 2000/mo, so 10000 is a generous ceiling. Adjust per org reality.
+const SOFT_MAX = {
+  calls: 10000, meetings: 500, deals: 100, reports: 50, reservations: 200,
+  fresh_leads: 5000,
+};
+
+function escapeHTML(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
+    {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]
+  ));
+}
+
+async function loadAll() {
+  if (!_drCtrl) return;
+  try {
+    const qs = _drCtrl.toQueryString();
+    const [u, report, ts, cfg] = await Promise.all([
+      api("/api/users?role=sales&active_only=true"),
+      api(`/api/kpi/report?${qs}`),
+      teams.length ? Promise.resolve(teams) : api("/api/teams").catch(() => []),
+      kpiConfig ? Promise.resolve(kpiConfig) : api("/api/kpi/config").catch(() => null),
+    ]);
+    if (_drFallbackArmed && Array.isArray(report) && report.length === 0
+        && _drCtrl.getRange().preset !== "ytd") {
+      _drFallbackArmed = false;
+      _drCtrl.setRange({ preset: "ytd" });
+      return;
+    }
+    _drFallbackArmed = false;
+    users = u;
+    teams = ts || [];
+    kpiConfig = cfg || kpiConfig;
+    populateTeamFilter();
+    entries = {};
+    report.forEach(r => { entries[r.user_id] = r; });
+    renderAll();
+  } catch (e) { _drFallbackArmed = false; toastError(e); }
+}
+
+function populateTeamFilter() {
+  const sel = document.getElementById("teamFilter");
+  if (!sel) return;
+  const prev = sel.value;
+  const opts = [
+    `<option value="">${t("common.all")}</option>`,
+    `<option value="none">${t("filters.no_team")}</option>`,
+  ];
+  teams.forEach(team => {
+    opts.push(`<option value="${team.id}">${escapeHTML(team.name)}</option>`);
+  });
+  sel.innerHTML = opts.join("");
+  if (prev) sel.value = prev;
+}
+
+function resetFilters() {
+  document.getElementById("filterStatus").value = "all";
+  document.getElementById("teamFilter").value = "";
+  document.getElementById("searchBox").value = "";
+  applyFilters();
+}
+
+function renderChips() {
+  const status = document.getElementById("filterStatus").value;
+  const teamVal = document.getElementById("teamFilter").value;
+  const search = document.getElementById("searchBox").value.trim();
+  const chips = [];
+  if (status && status !== "all") {
+    const lbl = {
+      pending: t("de.waiting_eval"),
+      done: t("de.evaluated"),
+      "no-sales": t("de.missing_sales"),
+    }[status] || status;
+    chips.push(`<span class="pf-chip">${t("common.filter")}: ${escapeHTML(lbl)}<button onclick="clearChip('filterStatus','all')">✕</button></span>`);
+  }
+  if (teamVal) {
+    let label = t("filters.no_team");
+    if (teamVal !== "none") {
+      const tm = teams.find(x => String(x.id) === teamVal);
+      label = tm ? tm.name : teamVal;
+    }
+    chips.push(`<span class="pf-chip">${t("filters.team")}: ${escapeHTML(label)}<button onclick="clearChip('teamFilter','')">✕</button></span>`);
+  }
+  if (search) {
+    chips.push(`<span class="pf-chip">${t("common.search")}: ${escapeHTML(search)}<button onclick="clearChip('searchBox','')">✕</button></span>`);
+  }
+  document.getElementById("chipsRow").innerHTML = chips.join("");
+}
+
+function clearChip(id, val) {
+  const el = document.getElementById(id);
+  if (el) { el.value = val; applyFilters(); }
+}
+
+function onSearchInput() {
+  const sb = document.getElementById("searchBox");
+  const clr = document.getElementById("deSearchClear");
+  if (clr) clr.hidden = !(sb && sb.value.length);
+  applyFilters();
+}
+
+// ─── New Evaluation modal (DE-05/06) ─────────────────────────────────────
+// Quick-pick a sales rep + month, then scrolls to that rep's card and
+// focuses the first numeric input. Doesn't open a separate form — it just
+// surfaces the existing per-card inline form, which already handles save +
+// validation + score preview. This lets the spec's "prominent button" hook
+// into the existing data flow without forking the entry mechanism.
+function openNewEvalModal() {
+  const sel = document.getElementById("neRep");
+  // Build the rep options from the loaded sales-user list. Sorted alpha.
+  const opts = [`<option value="">${t("de.pick_rep_placeholder")}</option>`];
+  [...users].sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""))
+    .forEach(u => opts.push(`<option value="${u.id}">${escapeHTML(u.full_name)}</option>`));
+  sel.innerHTML = opts.join("");
+  // Default month: whichever single month the picker currently sits on,
+  // else the picker's range.to month, else current month.
+  const r = _drCtrl ? _drCtrl.getRange() : null;
+  const monthInput = document.getElementById("neMonth");
+  monthInput.value = (r && r.monthStr) || (r ? r.to.slice(0, 7) : currentMonth());
+  openModal("newEvalModal");
+  setTimeout(() => sel.focus(), 50);
+}
+
+function startNewEvaluation() {
+  const repId = document.getElementById("neRep").value;
+  const month = document.getElementById("neMonth").value;
+  if (!repId) {
+    toast(t("de.pick_rep_required"), "error");
+    return;
+  }
+  if (!month) {
+    toast(t("de.pick_month_required"), "error");
+    return;
+  }
+  closeModal("newEvalModal");
+  // If the picker's current range doesn't already cover this month,
+  // snap the picker so the rep's card actually appears in the list.
+  if (_drCtrl) {
+    const r = _drCtrl.getRange();
+    if (!r || r.monthStr !== month) {
+      const [y, m] = month.split("-").map(Number);
+      const last = new Date(y, m, 0).getDate();
+      _drCtrl.setRange({
+        from: `${month}-01`,
+        to:   `${month}-${String(last).padStart(2, "0")}`,
+        preset: "custom",
+      });
+      // setRange triggers loadAll → renderAll. After that finishes,
+      // _focusAfterReload (existing flow) handles scroll + focus.
+    }
+  }
+  _focusAfterReload = Number(repId);
+  // If the card is already in the DOM and visible, scroll directly.
+  const existing = document.querySelector(`.card[data-user-id="${repId}"]`);
+  if (existing && !existing.classList.contains("is-hidden")) {
+    expandCard(Number(repId));
+    existing.scrollIntoView({ behavior: "smooth", block: "start" });
+    const first = existing.querySelector("input[type='number']");
+    if (first) first.focus();
+    _focusAfterReload = null;
+  }
+}
+
+function clearSearchBox() {
+  const sb = document.getElementById("searchBox");
+  if (sb) { sb.value = ""; sb.focus(); }
+  onSearchInput();
+}
+
+function renderTilesAndCharts() {
+  // Compose lists
+  const total = users.length;
+  const done    = users.filter(u => entries[u.id] && entries[u.id].dataentry_submitted_at).length;
+  const pending = users.filter(u => entries[u.id] && entries[u.id].sales_submitted_at && !entries[u.id].dataentry_submitted_at).length;
+  const missing = users.filter(u => !entries[u.id] || !entries[u.id].sales_submitted_at).length;
+
+  document.getElementById("tile_total").textContent = total;
+  document.getElementById("tile_done").textContent  = done;
+  document.getElementById("tile_done_sub").textContent = total ? Math.round(done/total*100) + "%" : "0%";
+  document.getElementById("tile_pending").textContent = pending;
+  document.getElementById("tile_missing").textContent = missing;
+
+  if (typeof Plotly === 'undefined') return;
+
+  // Status donut
+  const labels = [], values = [], colors = [];
+  if (done)    { labels.push(t("de.evaluated"));    values.push(done);    colors.push(Charts.COLORS.accent2); }
+  if (pending) { labels.push(t("de.waiting_eval")); values.push(pending); colors.push(Charts.COLORS.warning2); }
+  if (missing) { labels.push(t("de.missing_sales"));values.push(missing); colors.push(Charts.COLORS.danger2); }
+  if (values.length) {
+    Charts.drawDonut("chartProgress", { labels, values, colors }, { centerText: total + "" });
+  } else {
+    if (Charts.cancelPending) Charts.cancelPending("chartProgress");
+    document.getElementById("chartProgress").innerHTML = `<div class="empty-state" style="padding:30px">${t("dash.no_data")}</div>`;
+  }
+
+  // Top scores horizontal bar — only show users with submissions
+  const scored = users
+    .map(u => ({ u, e: entries[u.id] }))
+    .filter(x => x.e && (x.e.sales_submitted_at || x.e.dataentry_submitted_at))
+    .map(x => ({ name: x.u.full_name, score: parseFloat(x.e.total_score) || 0 }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10);
+
+  if (scored.length) {
+    Charts.drawHorizontalBar("chartScores", {
+      x: scored.map(s => s.score).reverse(),
+      y: scored.map(s => s.name).reverse(),
+      colors: scored.map(s => Charts.scoreColorHex(s.score)).reverse(),
+      labels: scored.map(s => s.score.toFixed(1) + "%").reverse(),
+    });
+  } else {
+    if (Charts.cancelPending) Charts.cancelPending("chartScores");
+    document.getElementById("chartScores").innerHTML = `<div class="empty-state" style="padding:30px">${t("dash.no_data")}</div>`;
+  }
+}
+
+// Full DOM rebuild — only called when underlying data changes (loadAll, lang switch).
+// Filter/search use applyFilters() instead so unsaved input values stay intact.
+function renderAll() {
+  const container = document.getElementById("list");
+  const rows = users.map(u => ({ user: u, entry: entries[u.id] || null }));
+  if (!rows.length) {
+    container.innerHTML = `<div class="card text-center text-muted" style="padding:50px">${t("admin.no_users")}</div>`;
+  } else {
+    container.innerHTML = rows.map(({user, entry}) => renderCard(user, entry)).join("");
+  }
+  renderTilesAndCharts();
+  applyFilters();
+}
+
+// Visibility-toggle path — preserves all in-progress input values across the cards.
+function applyFilters() {
+  const filter = document.getElementById("filterStatus").value;
+  const teamVal = document.getElementById("teamFilter").value;
+  const search = (document.getElementById("searchBox").value || "").trim().toLowerCase();
+  const container = document.getElementById("list");
+  const cards = container.querySelectorAll(".card[data-user-id]");
+
+  let shown = 0;
+  cards.forEach(card => {
+    const status = card.dataset.status;       // "done" | "pending" | "missing"
+    const team   = card.dataset.team;          // team id or "none"
+    const hay    = card.dataset.search || "";  // lowercase name + username
+    const owner  = card.dataset.owner || "";   // dataentry_by user id (string)
+
+    let visible = true;
+    if (filter === "pending"  && status !== "pending") visible = false;
+    if (filter === "done"     && status !== "done")    visible = false;
+    if (filter === "no-sales" && status !== "missing") visible = false;
+    // DE-08: "My Submissions" — only entries I personally evaluated.
+    if (filter === "mine"     && (owner === "" || Number(owner) !== CURRENT_USER_ID)) visible = false;
+    if (teamVal === "none" && team !== "none") visible = false;
+    else if (teamVal && team !== teamVal)      visible = false;
+    if (search && !hay.includes(search))       visible = false;
+
+    card.classList.toggle("is-hidden", !visible);
+    if (visible) shown++;
+  });
+
+  // Empty-state placeholder lives in the same #list — toggle separately
+  let empty = container.querySelector(".de-empty");
+  if (!shown && cards.length) {
+    if (!empty) {
+      empty = document.createElement("div");
+      empty.className = "card de-empty text-center";
+      container.appendChild(empty);
+    }
+    empty.innerHTML =
+      `<div class="text-muted" style="padding:30px 20px 16px">${t("admin.no_users")}</div>
+       <button type="button" class="btn btn-sm" onclick="resetFilters()">
+         <span class="material-symbols-outlined" aria-hidden="true">restart_alt</span>
+         <span>${t("pf.clear_filters")}</span>
+       </button>`;
+  } else if (empty) {
+    empty.remove();
+  }
+
+  const done = users.filter(u => entries[u.id] && entries[u.id].dataentry_submitted_at).length;
+  document.getElementById("progress").textContent =
+    `${t("de.progress")} ${done} ${t("de.of")} ${users.length}  ·  ${t("filters.shown")} ${shown}`;
+  renderChips();
+}
+
+function renderCard(user, entry) {
+  const isDone = entry && entry.dataentry_submitted_at;
+  const hasNumeric = entry && entry.sales_submitted_at;
+  const score = entry ? parseFloat(entry.total_score) || 0 : 0;
+
+  const statusBadges = [
+    dePill('sales', !!hasNumeric),
+    dePill('eval',  !!isDone),
+  ];
+
+  // Inline mini-score block — only rendered for already-evaluated reps.
+  // Re-uses the rating bands from common.js so colors stay in lockstep with kpi_logic.py.
+  const scoreBlock = isDone
+    ? `<div class="entry-score-mini">
+        <div class="num ${(entry.rating ? ratingClass(entry.rating) : ratingClass(localRating(score))).replace('badge-','')}">${score.toFixed(1)}%</div>
+        <div class="label">${t("rating." + (entry.rating || localRating(score)))}</div>
+       </div>`
+    : "";
+
+  // Filter-matching attributes — applyFilters() reads these instead of rebuilding the DOM.
+  const status = isDone ? "done" : (hasNumeric ? "pending" : "missing");
+  const teamAttr = user.team_id == null ? "none" : String(user.team_id);
+  const searchHay = ((user.full_name || "") + " " + (user.username || "")).toLowerCase();
+  // dataentry_by lets the "mine" filter (DE-08) match my own submissions.
+  const ownerAttr = (entry && entry.dataentry_by != null) ? String(entry.dataentry_by) : "";
+
+  // The form body is rendered lazily on first expand (see _renderCardBody)
+  // so a 50-rep team doesn't pay 700+ form-input DOM cost up front.
+  return `<div class="card de-card" data-user-id="${user.id}" data-status="${status}" data-team="${escapeHTML(teamAttr)}" data-search="${escapeHTML(searchHay)}" data-owner="${escapeHTML(ownerAttr)}">
+    <div class="de-card-head" role="button" tabindex="0" aria-expanded="false" aria-controls="body-${user.id}" onclick="toggleCard(${user.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleCard(${user.id});}">
+      <div class="row-actor">
+        <div class="avatar">${escapeHTML((user.full_name || "?")[0])}</div>
+        <div>
+          <div class="de-card-name">${escapeHTML(user.full_name)}</div>
+          <div class="de-card-username">@${escapeHTML(user.username)}</div>
+        </div>
+      </div>
+      <div class="de-card-status">
+        ${statusBadges.join("")}
+        ${scoreBlock}
+        <span class="de-card-toggle" aria-hidden="true">
+          <span class="material-symbols-outlined">expand_more</span>
+        </span>
+      </div>
+    </div>
+
+    <div class="de-card-body" id="body-${user.id}" data-rendered="0"></div>
+  </div>`;
+}
+
+// Build the per-user form HTML on demand. Pulls live from `users` and
+// `entries` so a save → refresh → re-expand cycle picks up the new values
+// without us having to thread state through.
+function _renderCardBody(userId) {
+  const user = users.find(u => u.id === userId);
+  if (!user) return "";
+  const entry = entries[userId] || null;
+
+  const v = (key, def = "") => {
+    if (!entry || entry[key] == null) return def;
+    return entry[key];
+  };
+
+  const numericInputs = NUMERIC.map(k => {
+    const isPct = PCT_FIELDS.has(k);
+    const fid = `${k}-${user.id}`;
+    const softMax = SOFT_MAX[k];
+    return `<div class="field">
+      <label for="${fid}">${t("kpi." + k)}${isPct ? " %" : ""}</label>
+      <input type="number" min="0" ${isPct ? 'max="100" step="0.1"' : ""}
+             id="${fid}" name="${k}" data-kpi-key="${k}" value="${escapeHTML(v(k, ""))}"
+             aria-describedby="warn-soft-${fid}">
+      <small id="warn-soft-${fid}" class="field-soft-warn" hidden>
+        ${softMax ? t("de.value_seems_high").replace("{n}", softMax.toLocaleString()) : ""}
+      </small>
+    </div>`;
+  }).join("");
+
+  const passfailInputs = PASSFAIL.map(k => {
+    const current = entry ? Number(entry[k] || 0) : 0;
+    const fid = `${k}-${user.id}`;
+    const label = t("kpi." + k);
+    const isPass = current === 100;
+    return `<div class="field">
+      <span class="field-label-text">${label}</span>
+      <div class="passfail-toggle" role="radiogroup" aria-label="${escapeHTML(label)}">
+        <button type="button" role="radio" aria-checked="${isPass}" data-pf-target="${fid}" data-pf-value="100" class="${isPass ? 'is-active' : ''}">${t("common.pass")}</button>
+        <button type="button" role="radio" aria-checked="${!isPass}" data-pf-target="${fid}" data-pf-value="0" class="${!isPass ? 'is-active' : ''}">${t("common.fail")}</button>
+      </div>
+      <input type="hidden" id="${fid}" value="${isPass ? 100 : 0}">
+    </div>`;
+  }).join("");
+
+  return `
+    <form id="form-${user.id}" onsubmit="event.preventDefault();saveEval(${user.id})">
+      <div class="form-section-title de-section-title">${t("sales.numeric_perf")}</div>
+      <div class="field-row four de-field-grid">${numericInputs}</div>
+
+      <div class="form-section-title">${t("tl_eval.personal_eval")}</div>
+      <div class="field-row five de-field-grid">${passfailInputs}</div>
+
+      <div class="field notes-field">
+        <label for="notes-${user.id}">${t("de.notes")}</label>
+        <textarea id="notes-${user.id}" rows="2" maxlength="400"
+                  placeholder="${t("de.notes_ph")}"
+                  data-char-counter="counter-${user.id}">${escapeHTML(entry && entry.notes ? entry.notes : '')}</textarea>
+        <small id="counter-${user.id}" class="char-count">${(entry && entry.notes ? entry.notes : '').length}/400</small>
+      </div>
+
+      <div class="de-warn" id="warn-${user.id}" role="alert" hidden>
+        <span class="material-symbols-outlined" aria-hidden="true">info</span>
+        <span>${t("de.confirm_no_numeric")}</span>
+        <button type="submit" class="de-warn-confirm">${t("de.save_anyway")}</button>
+      </div>
+      <div class="de-card-actions">
+        <span class="de-preview" id="preview-${user.id}" aria-live="polite"></span>
+        <button type="submit" class="btn btn-primary">${t("de.save_eval")}</button>
+        ${entry ? `<button type="button" class="btn" onclick="showDetail(${user.id})">${t("common.details")}</button>` : ''}
+      </div>
+    </form>`;
+}
+
+// Accordion toggle — keeps focus management for keyboard users. Renders the
+// form body the first time the card is expanded (cheap up-front DOM cost).
+function toggleCard(userId) {
+  const card = document.querySelector(`.de-card[data-user-id="${userId}"]`);
+  if (!card) return;
+  const head = card.querySelector(".de-card-head");
+  const body = card.querySelector(".de-card-body");
+  const expand = !card.classList.contains("is-expanded");
+  card.classList.toggle("is-expanded", expand);
+  if (head) head.setAttribute("aria-expanded", expand ? "true" : "false");
+  if (expand) {
+    if (body && body.dataset.rendered !== "1") {
+      body.innerHTML = _renderCardBody(userId);
+      body.dataset.rendered = "1";
+    }
+    // Refresh derived UI now that the form is in the layout flow.
+    if (typeof refreshPreview === "function") refreshPreview(String(userId));
+  }
+}
+
+function expandCard(userId) {
+  const card = document.querySelector(`.de-card[data-user-id="${userId}"]`);
+  if (!card || card.classList.contains("is-expanded")) return;
+  toggleCard(userId);
+}
+
+// Reuse the .status-pill markup from dashboard so eval status reads consistently
+// across the app — icon + label, not bare badge text.
+function dePill(kind, done) {
+  // kind: 'sales' (rep submitted KPI numbers) or 'eval' (data entry evaluated them)
+  const label = kind === 'sales' ? t("de.sales_done_short") : t("de.evaluated");
+  const pendingLabel = kind === 'sales' ? t("de.sales_not_done") : t("de.waiting_eval");
+  const icon  = done ? "check_circle" : "radio_button_unchecked";
+  const cls   = done ? "is-done" : "is-pending";
+  return `<span class="status-pill ${cls}">
+    <span class="material-symbols-outlined" aria-hidden="true">${icon}</span>${done ? label : pendingLabel}
+  </span>`;
+}
+
+// Track which cards have already shown the "no numeric data" warning, so the
+// second submit (or a click on the Save-anyway button inside the warn strip)
+// proceeds without re-prompting.
+const _warnedCards = new Set();
+
+// When the picker covers a multi-month or sub-month range, an entry's actual
+// month comes from its existing row; for new entries (no row in `entries`)
+// fall back to the picker's monthStr (single month) or the range's to-month.
+function _editingMonth(userId) {
+  const existing = entries[userId];
+  if (existing && existing.month) return existing.month;
+  const r = _drCtrl ? _drCtrl.getRange() : null;
+  if (r && r.monthStr) return r.monthStr;
+  return r ? r.to.slice(0, 7) : currentMonth();
+}
+
+async function saveEval(userId) {
+  const month = _editingMonth(userId);
+  const body = {
+    user_id: userId,
+    month,
+    notes: document.getElementById(`notes-${userId}`).value || "",
+  };
+
+  let hasNumeric = false;
+  NUMERIC.forEach(k => {
+    const el = document.getElementById(`${k}-${userId}`);
+    const raw = (el.value || "").trim();
+    if (raw === "") return;
+    const n = Number(raw);
+    if (isNaN(n) || n < 0) return;
+    body[k] = n;
+    hasNumeric = true;
+  });
+
+  // Inline warn instead of native confirm() — surface the message in-card,
+  // require a second submit to proceed. Tone: factual, not blocking.
+  const warn = document.getElementById(`warn-${userId}`);
+  if (!hasNumeric && !_warnedCards.has(userId)) {
+    if (warn) warn.hidden = false;
+    _warnedCards.add(userId);
+    return;
+  }
+  if (warn) warn.hidden = true;
+  _warnedCards.delete(userId);
+
+  PASSFAIL.forEach(k => body[k] = document.getElementById(`${k}-${userId}`).value);
+
+  try {
+    const data = await api("/api/kpi/submit/evaluation", { method: "POST", body });
+    toast(`${t("common.saved")} — ${data.total_score}%`, "success");
+    loadAll();
+  } catch (e) { toastError(e); }
+}
+
+function showDetail(userId) {
+  const month = _editingMonth(userId);
+  window.location.href = `/dashboard?user=${userId}&month=${encodeURIComponent(month)}`;
+}
+
+// ─── Live score preview ────────────────────────────────────────────
+// Mirrors compute_score() in app/kpi_logic.py: weighted achievement out of 100,
+// each KPI capped at 100% achievement. Server is still the source of truth on save.
+function computePreviewScore(userId) {
+  if (!kpiConfig || !kpiConfig.kpis) return null;
+  const freshEl = document.getElementById(`fresh_leads-${userId}`);
+  const freshLeads = freshEl ? Number(freshEl.value) || 0 : 0;
+  let total = 0;
+  let totalWeight = 0;
+
+  Object.entries(kpiConfig.kpis).forEach(([key, def]) => {
+    const el = document.getElementById(`${key}-${userId}`);
+    if (!el) return;
+    const raw = (el.value || "").trim();
+    if (raw === "") return;  // Field unfilled — exclude from preview
+    const actual = Number(raw);
+    if (isNaN(actual)) return;
+
+    const target = def.target_type === "leads_pct"
+      ? Math.max(1, freshLeads * (def.target_pct || 0) / 100)
+      : (def.target || 1);
+    const ach = Math.min(actual / target, 1);
+    total += ach * (def.weight || 0);
+    totalWeight += (def.weight || 0);
+  });
+
+  return totalWeight ? total : null;
+}
+
+function refreshPreview(userId) {
+  const el = document.getElementById(`preview-${userId}`);
+  if (!el) return;
+  const score = computePreviewScore(userId);
+  if (score == null) { el.textContent = ""; return; }
+  const rating = localRating(score);
+  const cls = ratingClass(rating).replace("badge-","");
+  el.innerHTML = `<span class="de-preview-label">${t("de.preview_score")}</span>
+                  <span class="de-preview-num is-${cls}">${score.toFixed(1)}%</span>
+                  <span class="de-preview-rating">${t("rating." + rating)}</span>`;
+}
+
+// ─── Soft upper-bound warning ──────────────────────────────────────
+function refreshSoftWarn(input) {
+  const key = input.dataset.kpiKey;
+  const max = SOFT_MAX[key];
+  if (!max) return;
+  const v = Number(input.value);
+  const warn = document.getElementById(`warn-soft-${input.id}`);
+  if (!warn) return;
+  warn.hidden = !(v && v > max);
+}
+
+// ─── Char counter ──────────────────────────────────────────────────
+function refreshCharCount(textarea) {
+  const target = textarea.dataset.charCounter;
+  const counter = target ? document.getElementById(target) : null;
+  if (!counter) return;
+  counter.textContent = `${textarea.value.length}/${textarea.maxLength || 400}`;
+}
+
+// ─── Form-level input listener: drives preview + soft-warn + counter ─
+document.addEventListener("input", (e) => {
+  const target = e.target;
+  if (!target) return;
+  const card = target.closest("[data-user-id]");
+  if (!card) return;
+  const userId = card.dataset.userId;
+
+  if (target.matches("input[data-kpi-key], input[type='hidden'][id*='-']")) {
+    refreshPreview(userId);
+  }
+  if (target.matches("input[data-kpi-key]")) {
+    refreshSoftWarn(target);
+  }
+  if (target.matches("textarea[data-char-counter]")) {
+    refreshCharCount(target);
+  }
+});
+
+// ─── Ctrl/Cmd+Enter — save current card and focus next pending ──────
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey)) return;
+  const card = e.target.closest("[data-user-id]");
+  if (!card) return;
+  e.preventDefault();
+  const userId = Number(card.dataset.userId);
+  // Save current — saveEval triggers loadAll on success which re-renders.
+  // Stash the next-pending user id so the post-load step can focus into it.
+  const nextCard = _findNextPendingAfter(card);
+  _focusAfterReload = nextCard ? Number(nextCard.dataset.userId) : null;
+  saveEval(userId);
+});
+
+function _findNextPendingAfter(card) {
+  let n = card.nextElementSibling;
+  while (n) {
+    if (n.matches && n.matches(".card[data-user-id]") && !n.classList.contains("is-hidden")) {
+      const status = n.dataset.status;
+      if (status === "pending" || status === "missing") return n;
+    }
+    n = n.nextElementSibling;
+  }
+  return null;
+}
+
+let _focusAfterReload = null;
+// Hook renderAll: after full re-render, focus the queued next-pending card.
+const _origRenderAll = renderAll;
+renderAll = function patchedRenderAll() {
+  _origRenderAll();
+  if (_focusAfterReload != null) {
+    const next = document.querySelector(`.card[data-user-id="${_focusAfterReload}"]`);
+    if (next) {
+      expandCard(_focusAfterReload);
+      next.scrollIntoView({ behavior: "smooth", block: "start" });
+      const first = next.querySelector("input[type='number']");
+      if (first) first.focus();
+    }
+    _focusAfterReload = null;
+  }
+};
+
+function onLangChange() {
+  if (_drCtrl) _drCtrl.refreshLabels();
+  // Card labels are baked into renderCard's template literals via t() — they don't
+  // re-translate via applyLang() alone. We rebuild, but snapshot every in-progress
+  // input value first and restore it after so unsaved work survives the language flip.
+  const drafts = new Map();
+  document.querySelectorAll('#list input, #list textarea, #list select').forEach(el => {
+    if (el.id) drafts.set(el.id, el.value);
+  });
+  const visibleWarns = new Set();
+  document.querySelectorAll('#list .de-warn:not([hidden])').forEach(w => {
+    if (w.id) visibleWarns.add(w.id);
+  });
+  const expandedCards = new Set();
+  document.querySelectorAll('#list .de-card.is-expanded').forEach(c => {
+    if (c.dataset.userId) expandedCards.add(Number(c.dataset.userId));
+  });
+
+  renderAll();
+
+  expandedCards.forEach(uid => expandCard(uid));
+
+  drafts.forEach((value, id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = value;
+  });
+  visibleWarns.forEach(id => {
+    const w = document.getElementById(id);
+    if (w) w.hidden = false;
+  });
+
+  // Re-sync pass/fail toggle visual state from each hidden input value
+  // (rebuild generated buttons against server data; we just restored user drafts).
+  document.querySelectorAll('#list .passfail-toggle').forEach(group => {
+    const firstBtn = group.querySelector('button[data-pf-target]');
+    if (!firstBtn) return;
+    const targetId = firstBtn.getAttribute('data-pf-target');
+    const hidden = document.getElementById(targetId);
+    if (!hidden) return;
+    const want = String(hidden.value);
+    group.querySelectorAll('button').forEach(b => {
+      const active = b.getAttribute('data-pf-value') === want;
+      b.classList.toggle('is-active', active);
+      b.setAttribute('aria-checked', active ? 'true' : 'false');
+    });
+  });
+
+  // Re-fire derived UI: live preview, soft-bound warns, char counters.
+  document.querySelectorAll('#list .card[data-user-id]').forEach(card => {
+    const userId = card.dataset.userId;
+    if (typeof refreshPreview === 'function') refreshPreview(userId);
+  });
+  document.querySelectorAll('#list textarea[data-char-counter]').forEach(t => {
+    if (typeof refreshCharCount === 'function') refreshCharCount(t);
+  });
+  document.querySelectorAll('#list input[data-kpi-key]').forEach(inp => {
+    if (typeof refreshSoftWarn === 'function') refreshSoftWarn(inp);
+  });
+}
+
+// Action 2 — Pending tile click: filter to pending and scroll to first pending card.
+document.addEventListener('DOMContentLoaded', () => {
+  const tile = document.getElementById('detile_pending');
+  if (!tile) return;
+  const handler = () => {
+    document.getElementById('filterStatus').value = 'pending';
+    applyFilters();
+    const first = document.querySelector('#list .card[data-status="pending"]:not(.is-hidden)');
+    if (first) {
+      const uid = Number(first.dataset.userId);
+      if (uid) expandCard(uid);
+      first.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+  tile.addEventListener('click', handler);
+  tile.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); }
+  });
+});
+
+_drCtrl = DateRange.mount(document.getElementById("dateRangeHost"), {
+  defaultPreset: "last_30",
+  mode: "full",                       // dataentry can filter by submission date
+  onChange: () => loadAll(),
+});
+</script>
+{% endblock %}

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Monthly KPI Entry | Ain Real Estate</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-low": "#f1f3ff",
+                    "on-tertiary-container": "#f3fffd",
+                    "on-surface-variant": "#464653",
+                    "secondary": "#884f41",
+                    "primary-container": "#6067df",
+                    "surface-container": "#ebedfa",
+                    "surface-container-high": "#e5e7f4",
+                    "on-error": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "primary-fixed-dim": "#bfc2ff",
+                    "on-tertiary": "#ffffff",
+                    "tertiary-fixed": "#65f8ed",
+                    "surface-bright": "#faf9ff",
+                    "surface-tint": "#4950c7",
+                    "surface-container-lowest": "#ffffff",
+                    "on-primary-container": "#fffbff",
+                    "on-secondary": "#ffffff",
+                    "primary-fixed": "#e0e0ff",
+                    "outline-variant": "#c6c5d6",
+                    "on-primary": "#ffffff",
+                    "on-primary-fixed": "#02006d",
+                    "error": "#ba1a1a",
+                    "inverse-surface": "#2d303a",
+                    "surface-dim": "#d7d9e6",
+                    "error-container": "#ffdad6",
+                    "secondary-fixed-dim": "#ffb4a2",
+                    "on-secondary-container": "#7a4336",
+                    "primary": "#474dc5",
+                    "tertiary-container": "#00837c",
+                    "inverse-primary": "#bfc2ff",
+                    "secondary-fixed": "#ffdad2",
+                    "secondary-container": "#ffb4a2",
+                    "surface-variant": "#e0e2ef",
+                    "tertiary-fixed-dim": "#40dcd1",
+                    "on-tertiary-fixed-variant": "#00504b",
+                    "on-surface": "#181b24",
+                    "on-primary-fixed-variant": "#3035af",
+                    "background": "#faf9ff",
+                    "outline": "#767685",
+                    "on-secondary-fixed": "#360e05",
+                    "on-secondary-fixed-variant": "#6c382b",
+                    "surface": "#faf9ff",
+                    "tertiary": "#006762",
+                    "on-tertiary-fixed": "#00201e",
+                    "inverse-on-surface": "#eef0fd",
+                    "surface-container-highest": "#e0e2ef",
+                    "on-background": "#181b24"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "card-padding": "20px",
+                    "unit": "4px",
+                    "gutter": "24px",
+                    "container-margin": "32px",
+                    "element-gap": "12px"
+            },
+            "fontFamily": {
+                    "body-lg": ["Inter"],
+                    "label-caps": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "headline-xl": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "data-num": ["Inter"]
+            },
+            "fontSize": {
+                    "body-lg": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "body-sm": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "headline-xl": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-md": ["20px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                    "data-num": ["24px", {"lineHeight": "1", "letterSpacing": "-0.01em", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background: radial-gradient(circle at top left, #f1f3ff, #faf9ff);
+            min-height: 100vh;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(24px);
+            border-top: 1px solid rgba(255, 255, 255, 0.4);
+            border-left: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 10px 30px rgba(124, 131, 253, 0.1);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="font-body-lg text-on-surface">
+<!-- TopNavBar -->
+<header class="bg-white/70 backdrop-blur-xl text-indigo-500 font-sans tracking-tight text-sm font-medium docked full-width top-0 sticky z-50 border-b border-white/40 shadow-[0_10px_30px_rgba(124,131,253,0.1)]">
+<div class="flex justify-between items-center px-8 h-16 w-full max-w-[1920px] mx-auto">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold tracking-tighter text-indigo-600">Ain Real Estate</span>
+<nav class="hidden md:flex gap-6 items-center">
+<a class="text-slate-500 hover:text-indigo-400 transition-colors" href="#">Dashboard</a>
+<a class="text-indigo-600 border-b-2 border-indigo-500 pb-1" href="#">Evaluation</a>
+<a class="text-slate-500 hover:text-indigo-400 transition-colors" href="#">Finance</a>
+<a class="text-slate-500 hover:text-indigo-400 transition-colors" href="#">Users</a>
+<a class="text-slate-500 hover:text-indigo-400 transition-colors" href="#">PropFinder</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 hover:bg-white/20 transition-all duration-300 rounded-full">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 hover:bg-white/20 transition-all duration-300 rounded-full">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-primary-container overflow-hidden ring-2 ring-white/50">
+<img alt="User profile avatar" class="w-full h-full object-cover" data-alt="professional headshot of a sales executive in a bright modern office setting, soft natural lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAsj5rlY_DQRzOHKQW85DuxCZ17WpDRUA6bUPfwYI5eaeuHTf4O8oX9_AvimgIwdvPYiFv3G6kQ9xUSN4AgiTR-30I6PV5K8gqhn-9w1xwNd5aOneBoPH9U4tt0b8sD3gZXb8FwQ5KUFMir-uJhSREXbgTe5lQupVDi1-klZARJ8AddtjVFFkedBpHQlBVEVm493gnHbA_xPbumeeIjSR6dQIn259SvywJb-o3z0Q72vevuLNAvkTbY-X9QhC689xyXqQTxxWmxtywP"/>
+</div>
+</div>
+</div>
+</header>
+<div class="flex">
+<!-- SideNavBar -->
+<aside class="bg-white/60 backdrop-blur-2xl text-indigo-500 font-sans text-sm font-semibold h-screen w-64 fixed left-0 top-16 border-r border-white/30 shadow-xl shadow-indigo-500/5 hidden md:flex flex-col p-4 gap-2">
+<div class="mb-8 px-2">
+<h2 class="text-lg font-black text-indigo-700">Ain Management</h2>
+<p class="text-xs text-slate-400 font-normal">Premium Assets</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-white/40 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span>Overview</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-indigo-50/50 text-indigo-600 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="domain">domain</span>
+<span>Portfolio</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-white/40 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span>Transactions</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-white/40 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="query_stats">query_stats</span>
+<span>Market Analysis</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-white/40 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+<span>Reports</span>
+</a>
+</nav>
+<div class="pt-4 border-t border-white/20 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-white/40" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span>Support</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-white/40" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span>Logout</span>
+</a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="md:ml-64 flex-1 p-8">
+<div class="max-w-6xl mx-auto space-y-8">
+<!-- Header Section -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+<div>
+<h1 class="text-headline-xl font-headline-xl text-on-surface">Monthly KPI Entry</h1>
+<p class="text-body-sm text-outline">Submit your performance data for review</p>
+</div>
+<div class="flex items-center gap-3 glass-card px-4 py-2 rounded-xl">
+<span class="material-symbols-outlined text-primary" data-icon="calendar_month">calendar_month</span>
+<select class="bg-transparent border-none text-body-sm font-semibold focus:ring-0 p-0 pr-8 cursor-pointer">
+<option>October 2023</option>
+<option>September 2023</option>
+<option selected="">November 2023</option>
+</select>
+</div>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+<!-- Left Column: Form Sections -->
+<div class="lg:col-span-8 space-y-6">
+<!-- Basic Data Section -->
+<section class="glass-card p-card-padding rounded-xl">
+<div class="flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-primary" data-icon="database">database</span>
+<h3 class="text-headline-md font-headline-md">Basic Data</h3>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="space-y-2">
+<label class="text-label-caps font-label-caps text-outline">FRESH LEADS ASSIGNED</label>
+<input class="w-full bg-white/40 border-none rounded-lg focus:ring-2 focus:ring-primary-container text-data-num font-data-num placeholder:text-surface-variant" placeholder="0" type="number"/>
+</div>
+<div class="space-y-2">
+<label class="text-label-caps font-label-caps text-outline">REFERRALS GENERATED</label>
+<input class="w-full bg-white/40 border-none rounded-lg focus:ring-2 focus:ring-primary-container text-data-num font-data-num placeholder:text-surface-variant" placeholder="0" type="number"/>
+</div>
+</div>
+</section>
+<!-- Performance Metrics Section -->
+<section class="glass-card p-card-padding rounded-xl">
+<div class="flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-tertiary-container" data-icon="monitoring">monitoring</span>
+<h3 class="text-headline-md font-headline-md">Performance Metrics</h3>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<div class="space-y-6">
+<div class="space-y-2">
+<div class="flex justify-between items-center">
+<label class="text-label-caps font-label-caps text-outline">TOTAL OUTBOUND CALLS</label>
+<span class="text-body-sm font-semibold text-primary">85/100</span>
+</div>
+<input class="w-full h-2 bg-surface-container-high rounded-full appearance-none cursor-pointer accent-primary-container" type="range"/>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between items-center">
+<label class="text-label-caps font-label-caps text-outline">CLIENT MEETINGS</label>
+<span class="text-body-sm font-semibold text-tertiary-container">12/15</span>
+</div>
+<input class="w-full h-2 bg-surface-container-high rounded-full appearance-none cursor-pointer accent-tertiary-container" type="range"/>
+</div>
+</div>
+<div class="space-y-6">
+<div class="space-y-2">
+<label class="text-label-caps font-label-caps text-outline">CRM ACCURACY (%)</label>
+<div class="relative">
+<input class="w-full bg-white/40 border-none rounded-lg focus:ring-2 focus:ring-primary-container text-data-num font-data-num pr-12" type="number" value="94"/>
+<span class="absolute right-4 top-1/2 -translate-y-1/2 text-body-lg text-outline">%</span>
+</div>
+</div>
+<div class="space-y-2">
+<label class="text-label-caps font-label-caps text-outline">DEALS CLOSED</label>
+<input class="w-full bg-white/40 border-none rounded-lg focus:ring-2 focus:ring-primary-container text-data-num font-data-num" placeholder="4" type="number"/>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Column: Results & Highlights -->
+<div class="lg:col-span-4 space-y-6">
+<!-- Preliminary Score Card -->
+<div class="glass-card p-8 rounded-2xl relative overflow-hidden text-center group">
+<div class="absolute top-0 right-0 p-4">
+<span class="material-symbols-outlined text-primary/20 text-6xl" data-icon="verified">verified</span>
+</div>
+<h3 class="text-label-caps font-label-caps text-outline mb-4">PRELIMINARY SCORE</h3>
+<div class="relative inline-block mb-4">
+<svg class="w-40 h-40 transform -rotate-90">
+<circle class="text-surface-container-high" cx="80" cy="80" fill="transparent" r="70" stroke="currentColor" stroke-width="12"></circle>
+<circle class="text-primary-container" cx="80" cy="80" fill="transparent" r="70" stroke="currentColor" stroke-dasharray="440" stroke-dashoffset="66" stroke-width="12"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="text-[44px] font-black text-on-surface leading-none">85%</span>
+<span class="text-body-sm font-bold text-primary">A- Grade</span>
+</div>
+</div>
+<p class="text-body-sm text-outline-variant px-4">Based on current inputs. Final evaluation subject to manager review.</p>
+</div>
+<!-- Mini Insights -->
+<div class="grid grid-cols-2 gap-4">
+<div class="glass-card p-4 rounded-xl border-l-4 border-tertiary-fixed-dim">
+<p class="text-label-caps font-label-caps text-outline mb-1">VELOCITY</p>
+<p class="text-headline-md font-headline-md">+12%</p>
+</div>
+<div class="glass-card p-4 rounded-xl border-l-4 border-secondary-fixed-dim">
+<p class="text-label-caps font-label-caps text-outline mb-1">CONVERSION</p>
+<p class="text-headline-md font-headline-md">4.2%</p>
+</div>
+</div>
+<!-- Action Card -->
+<div class="bg-primary-container p-6 rounded-2xl text-on-primary-container shadow-xl shadow-primary-container/30 space-y-4">
+<h4 class="text-headline-md font-headline-md">Ready to Submit?</h4>
+<p class="text-body-sm opacity-90">Ensure all data points are accurate. Once submitted, records are locked for the audit period.</p>
+<button class="w-full py-4 bg-white text-primary-container font-bold rounded-xl shadow-lg active:scale-95 transition-transform">
+                                Finalize Submission
+                            </button>
+</div>
+</div>
+</div>
+<!-- Footer Section Info -->
+<div class="flex flex-col md:flex-row justify-between items-center text-body-sm text-outline border-t border-white/20 pt-6">
+<p>© 2023 Ain Real Estate Management Portal</p>
+<div class="flex gap-6">
+<a class="hover:text-primary transition-colors" href="#">Privacy Policy</a>
+<a class="hover:text-primary transition-colors" href="#">KPI Guidelines</a>
+<a class="hover:text-primary transition-colors" href="#">Support Center</a>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

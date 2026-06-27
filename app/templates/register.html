@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% block title %}Ain Real Estate · Sign up{% endblock %}
+
+{% block main_class %}auth-main{% endblock %}
+
+{% block content %}
+<div class="auth-shell">
+  <aside class="auth-brand" aria-hidden="true">
+    <div class="auth-brand-bg">
+      <span class="auth-blob auth-blob-1"></span>
+      <span class="auth-blob auth-blob-2"></span>
+      <span class="auth-grid"></span>
+    </div>
+    <div class="auth-brand-content">
+      <div class="auth-brand-logo">
+        <span class="auth-brand-mark">{% include "_logo_mark.html" %}</span>
+        <span class="auth-brand-wordmark">
+          <span class="auth-brand-name">AIN</span>
+          <span class="auth-brand-tagline" data-i18n="brand.tagline">REAL ESTATE</span>
+        </span>
+      </div>
+      <h2 class="auth-brand-headline" data-i18n="auth.brand_headline"></h2>
+      <p class="auth-brand-sub" data-i18n="auth.brand_sub"></p>
+      <ul class="auth-brand-features">
+        <li><span class="material-symbols-outlined" aria-hidden="true">monitoring</span><span data-i18n="auth.feature_kpi"></span></li>
+        <li><span class="material-symbols-outlined" aria-hidden="true">domain</span><span data-i18n="auth.feature_propfinder"></span></li>
+        <li><span class="material-symbols-outlined" aria-hidden="true">groups</span><span data-i18n="auth.feature_teams"></span></li>
+      </ul>
+      <div class="auth-brand-trust">
+        <span class="material-symbols-outlined" aria-hidden="true">encrypted</span>
+        <span data-i18n="auth.secure_note"></span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="auth-form-panel">
+    <header class="auth-form-header">
+      <a href="/" class="auth-form-mini-brand">
+        <span class="auth-form-mini-mark">{% include "_logo_mark.html" %}</span>
+        <span class="auth-form-mini-name">AIN <span>· REAL ESTATE</span></span>
+      </a>
+      <div class="auth-form-actions">
+        <button id="themeToggleBtn" class="theme-toggle" data-i18n-title="nav.theme_toggle" data-i18n-aria-label="nav.theme_toggle">
+          <span class="material-symbols-outlined theme-toggle-icon-light" aria-hidden="true">light_mode</span>
+          <span class="material-symbols-outlined theme-toggle-icon-dark" aria-hidden="true">dark_mode</span>
+        </button>
+        <button id="langToggleBtn" class="lang-toggle" data-i18n-title="nav.language_toggle">EN</button>
+      </div>
+    </header>
+
+    <section class="auth-form-card">
+      <h1 class="auth-form-title" data-i18n="auth.signup_title"></h1>
+      <p class="auth-form-sub" data-i18n="auth.signup_subtitle"></p>
+
+      <div class="error-msg" id="errorMsg" role="alert" aria-live="assertive"></div>
+
+      <!-- Success state — replaces the form once the request is queued. -->
+      <div id="successPanel" class="auth-success" hidden>
+        <div class="auth-success-icon"><span class="material-symbols-outlined" aria-hidden="true">mark_email_read</span></div>
+        <h2 class="auth-success-title" data-i18n="auth.signup_success_title"></h2>
+        <p class="auth-success-body" data-i18n="auth.signup_success_body"></p>
+        <a href="/login" class="btn btn-primary btn-full" style="margin-top:18px" data-i18n="auth.go_to_login"></a>
+      </div>
+
+      <form id="registerForm" novalidate>
+        <div class="field">
+          <label for="full_name" data-i18n="auth.full_name"></label>
+          <div class="auth-input-wrap">
+            <span class="material-symbols-outlined auth-input-icon" aria-hidden="true">badge</span>
+            <input type="text" id="full_name" maxlength="150" required autocomplete="name" data-i18n-placeholder="auth.full_name_ph">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="username" data-i18n="auth.username"></label>
+          <div class="auth-input-wrap">
+            <span class="material-symbols-outlined auth-input-icon" aria-hidden="true">person</span>
+            <input type="text" id="username" pattern="[a-z0-9_.]{3,50}" maxlength="50" required autocomplete="username" data-i18n-placeholder="auth.username_ph">
+          </div>
+          <small class="text-muted" data-i18n="admin.username_hint"></small>
+        </div>
+
+        <div class="field">
+          <label for="email" data-i18n="auth.email"></label>
+          <div class="auth-input-wrap">
+            <span class="material-symbols-outlined auth-input-icon" aria-hidden="true">mail</span>
+            <input type="email" id="email" maxlength="150" required autocomplete="email" data-i18n-placeholder="auth.email_placeholder">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="phone" data-i18n="auth.phone"></label>
+          <div class="auth-input-wrap">
+            <span class="material-symbols-outlined auth-input-icon" aria-hidden="true">call</span>
+            <input type="tel" id="phone" maxlength="20" required autocomplete="tel" data-i18n-placeholder="auth.phone_placeholder">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="role" data-i18n="auth.signup_role_label"></label>
+          <select id="role" required>
+            <option value="sales" data-i18n="role.sales"></option>
+            <option value="marketing" data-i18n="role.marketing"></option>
+            <option value="team_leader" data-i18n="role.team_leader"></option>
+            <option value="dataentry" data-i18n="role.dataentry"></option>
+          </select>
+          <small class="text-muted" data-i18n="auth.signup_role_hint"></small>
+        </div>
+
+        <div class="field">
+          <label for="password" data-i18n="auth.password"></label>
+          <div class="auth-input-wrap">
+            <span class="material-symbols-outlined auth-input-icon" aria-hidden="true">lock</span>
+            <input type="password" id="password" minlength="8" maxlength="128" required autocomplete="new-password" data-i18n-placeholder="auth.password_ph">
+            <button type="button" class="pw-toggle pw-toggle-flush" data-target="password" data-i18n-aria-label="common.show_password">
+              <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+            </button>
+          </div>
+          <ul class="pw-rules" id="pwRules" aria-live="polite">
+            <li data-rule="length"><span class="material-symbols-outlined" aria-hidden="true">radio_button_unchecked</span><span data-i18n="profile.rule_length"></span></li>
+            <li data-rule="letter"><span class="material-symbols-outlined" aria-hidden="true">radio_button_unchecked</span><span data-i18n="profile.rule_letter"></span></li>
+            <li data-rule="digit"><span class="material-symbols-outlined" aria-hidden="true">radio_button_unchecked</span><span data-i18n="profile.rule_digit"></span></li>
+            <li data-rule="match"><span class="material-symbols-outlined" aria-hidden="true">radio_button_unchecked</span><span data-i18n="auth.rule_match"></span></li>
+          </ul>
+        </div>
+
+        <div class="field">
+          <label for="password_confirm" data-i18n="auth.confirm_password"></label>
+          <div class="auth-input-wrap">
+            <span class="material-symbols-outlined auth-input-icon" aria-hidden="true">lock</span>
+            <input type="password" id="password_confirm" minlength="8" maxlength="128" required autocomplete="new-password" data-i18n-placeholder="auth.password_confirm_ph">
+            <button type="button" class="pw-toggle pw-toggle-flush" data-target="password_confirm" data-i18n-aria-label="common.show_password">
+              <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full auth-submit" id="registerBtn" data-i18n="auth.signup_btn"></button>
+      </form>
+
+      <div class="auth-switch">
+        <span data-i18n="auth.have_account"></span>
+        <a href="/login" data-i18n="auth.login_link"></a>
+      </div>
+    </section>
+
+    <footer class="auth-form-footer">
+      <span data-i18n="auth.copyright"></span>
+    </footer>
+  </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const errorMsg = document.getElementById("errorMsg");
+const form = document.getElementById("registerForm");
+const btn = document.getElementById("registerBtn");
+const pw = document.getElementById("password");
+const pwConfirm = document.getElementById("password_confirm");
+
+// Always anchor any error/success at the top of the panel so the user can
+// see what happened without having to scroll up. Without this, a long form
+// can push the message below the fold.
+function _showError(text) {
+  errorMsg.textContent = text;
+  errorMsg.classList.add("show");
+  errorMsg.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+// Live password rule indicator — same shape as admin/profile pages so users
+// see exactly which rule is missing without a round-trip to the server.
+function refreshPwRules() {
+  const v = pw.value;
+  const rules = {
+    length: v.length >= 8,
+    letter: /[A-Za-z]/.test(v),
+    digit:  /\d/.test(v),
+    match:  v.length > 0 && pwConfirm.value === v,
+  };
+  document.querySelectorAll("#pwRules li").forEach(li => {
+    const r = li.getAttribute("data-rule");
+    const passed = !!rules[r];
+    li.classList.toggle("passed", passed);
+    const icon = li.querySelector(".material-symbols-outlined");
+    if (icon) icon.textContent = passed ? "check_circle" : "radio_button_unchecked";
+  });
+}
+pw.addEventListener("input", refreshPwRules);
+pwConfirm.addEventListener("input", refreshPwRules);
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  errorMsg.classList.remove("show");
+
+  const body = {
+    full_name: document.getElementById("full_name").value.trim(),
+    username:  document.getElementById("username").value.trim().toLowerCase(),
+    email:     document.getElementById("email").value.trim().toLowerCase(),
+    phone:     document.getElementById("phone").value.trim(),
+    role:      document.getElementById("role").value,
+    password:  pw.value,
+    // Seed the new user's display prefs from the screen they just left,
+    // so the pending-review email lands in matching colours.
+    theme: (typeof getTheme === "function" ? getTheme() : (localStorage.getItem("ain_theme") || "light")),
+    lang:  (typeof getLang  === "function" ? getLang()  : (localStorage.getItem("ain_lang")  || "ar")),
+  };
+  const pwConfirmVal = pwConfirm.value;
+
+  if (!body.full_name || !body.username || !body.email || !body.phone || !body.password) {
+    _showError(t("errors.required_fields_missing"));
+    return;
+  }
+  if (!/^[a-z0-9_.]{3,50}$/.test(body.username)) {
+    _showError(t("errors.username_too_short"));
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
+    _showError(t("errors.invalid_email"));
+    return;
+  }
+  if (!/^\+?[0-9][0-9\s\-]{6,19}$/.test(body.phone)) {
+    _showError(t("errors.invalid_phone"));
+    return;
+  }
+  if (body.password.length < 8 || !/[A-Za-z]/.test(body.password) || !/\d/.test(body.password)) {
+    _showError(t("errors.weak_password"));
+    return;
+  }
+  if (body.password !== pwConfirmVal) {
+    _showError(t("errors.password_mismatch"));
+    return;
+  }
+
+  btn.disabled = true;
+  const prev = btn.textContent;
+  btn.innerHTML = `<span class="loading"></span><span style="margin-inline-start:8px">${t("common.loading")}</span>`;
+
+  try {
+    await api("/api/auth/register", { method: "POST", body });
+    // On success, swap the form for a confirmation panel — keeps the user on
+    // the same page and makes "what next" obvious without a second round-trip.
+    form.hidden = true;
+    document.getElementById("successPanel").hidden = false;
+    applyLang(true);
+    document.getElementById("successPanel").scrollIntoView({ behavior: "smooth", block: "center" });
+  } catch (err) {
+    _showError(tError(err));
+    btn.disabled = false;
+    btn.textContent = prev;
+  }
+});
+</script>
+{% endblock %}

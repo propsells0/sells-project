@@ -1,0 +1,867 @@
+{% extends "base.html" %}
+{% block title %}Ain KPI{% endblock %}
+
+{% block head %}
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title" data-i18n="admin.title"></h1>
+    <p class="page-subtitle" data-i18n="admin.subtitle"></p>
+  </div>
+  <button class="btn btn-primary" onclick="openNew()" data-i18n="admin.add_user"></button>
+</div>
+
+
+<!-- Top tiles -->
+<div class="bento" id="adminTiles"></div>
+
+<!-- Charts row: role split donut + active/inactive donut -->
+<div class="bento">
+  <div class="chart-card span-6">
+    <h3 data-i18n="admin.role"></h3>
+    <div id="chartRoles" class="plotly-container short"></div>
+  </div>
+  <div class="chart-card span-6">
+    <h3 data-i18n="admin.filter_status"></h3>
+    <div id="chartStatus" class="plotly-container short"></div>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="field">
+    <label data-i18n="admin.filter_role"></label>
+    <select id="roleFilter" onchange="render()">
+      <option value="all" data-i18n="common.all"></option>
+      <option value="admin" data-i18n="role.admin"></option>
+      <option value="manager" data-i18n="role.manager"></option>
+      <option value="team_leader" data-i18n="role.team_leader"></option>
+      <option value="marketing" data-i18n="role.marketing"></option>
+      <option value="dataentry" data-i18n="role.dataentry"></option>
+      <option value="sales" data-i18n="role.sales"></option>
+    </select>
+  </div>
+  <div class="field">
+    <label data-i18n="admin.filter_status"></label>
+    <select id="statusFilter" onchange="render()">
+      <option value="all" data-i18n="common.all"></option>
+      <option value="online" data-i18n="common.online"></option>
+      <option value="offline" data-i18n="common.offline"></option>
+      <option value="disabled" data-i18n="common.disabled"></option>
+      <option value="pending" data-i18n="admin.status_pending"></option>
+    </select>
+  </div>
+  <div class="field">
+    <label data-i18n="filters.team"></label>
+    <select id="teamFilter" onchange="render()">
+      <option value="" data-i18n="common.all"></option>
+      <option value="none" data-i18n="filters.no_team"></option>
+    </select>
+  </div>
+  <div class="field" style="flex:1">
+    <label for="searchBox" data-i18n="common.search"></label>
+    <div class="pf-search-input-wrap">
+      <span class="material-symbols-outlined pf-search-icon" aria-hidden="true">search</span>
+      <input type="text" id="searchBox" data-i18n-placeholder="admin.search_ph" oninput="onAdminSearchInput()">
+      <button type="button" class="pf-search-clear" id="adminSearchClear" onclick="clearAdminSearch()" data-i18n-aria-label="common.clear" hidden>
+        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+      </button>
+    </div>
+  </div>
+  <div class="field" style="align-self:flex-end">
+    <button class="btn btn-ghost btn-sm" onclick="resetFilters()" data-i18n="filters.reset"></button>
+  </div>
+</div>
+
+<div id="chipsRow" class="pf-chips" style="margin-bottom:12px"></div>
+
+<!-- Pending sign-up requests — collapsed by default; expands when there's at
+     least one row so admins notice without it shouting from the top. -->
+<details class="card pending-card" id="pendingSection" hidden style="margin-bottom:16px">
+  <summary class="pending-summary">
+    <span class="material-symbols-outlined" aria-hidden="true">how_to_reg</span>
+    <span class="pending-title" data-i18n="admin.pending_section"></span>
+    <span class="badge badge-pending" id="pendingCount">0</span>
+    <span class="material-symbols-outlined pending-chev" aria-hidden="true">expand_more</span>
+  </summary>
+  <p class="text-muted" style="font-size:12px;margin:6px 0 14px" data-i18n="admin.pending_section_hint"></p>
+  <div id="pendingList"></div>
+</details>
+
+<div class="table-wrap reveal">
+  <table>
+    <thead><tr>
+      <th data-i18n="admin.user"></th>
+      <th data-i18n="admin.role"></th>
+      <th data-i18n="filters.team"></th>
+      <th data-i18n="admin.contact"></th>
+      <th data-i18n="admin.status"></th>
+      <th data-i18n="admin.actions"></th>
+    </tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="userModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle"></div>
+      <button class="modal-close" onclick="closeModal('userModal')" data-i18n-aria-label="common.close">✕</button>
+    </div>
+    <form id="userForm" novalidate>
+      <div class="modal-body">
+        <div class="error-msg" id="mError" role="alert" aria-live="assertive"></div>
+        <div class="field-row">
+          <div class="field">
+            <label for="mName" data-i18n="auth.full_name"></label>
+            <input type="text" id="mName" maxlength="150" required>
+          </div>
+          <div class="field">
+            <label for="mUsername" data-i18n="auth.username"></label>
+            <input type="text" id="mUsername" pattern="[a-z0-9_.]{3,}" maxlength="50" required aria-describedby="mUsernameHint">
+            <small id="mUsernameHint" class="text-muted" data-i18n="admin.username_hint"></small>
+          </div>
+        </div>
+        <div class="field">
+          <label for="mRole" data-i18n="admin.role"></label>
+          <select id="mRole" required>
+            <option value="sales" data-i18n="role.sales"></option>
+            <option value="team_leader" data-i18n="role.team_leader"></option>
+            <option value="marketing" data-i18n="role.marketing"></option>
+            <option value="dataentry" data-i18n="role.dataentry"></option>
+            <option value="manager" data-i18n="role.manager"></option>
+            <option value="admin" data-i18n="role.admin"></option>
+          </select>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="mEmail" data-i18n="auth.email"></label>
+            <input type="email" id="mEmail" maxlength="150" required>
+          </div>
+          <div class="field">
+            <label for="mPhone">
+              <span data-i18n="auth.phone"></span>
+              <small data-i18n="common.optional"></small>
+            </label>
+            <input type="tel" id="mPhone" maxlength="20">
+          </div>
+        </div>
+        <div class="field">
+          <label for="mPassword" data-i18n="auth.password"></label>
+          <div class="pw-input-wrap">
+            <input type="password" id="mPassword" minlength="8" maxlength="128" autocomplete="new-password">
+            <button type="button" class="pw-toggle" data-target="mPassword" data-i18n-aria-label="common.show_password">
+              <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+            </button>
+          </div>
+          <small class="text-muted" id="mPwHint"></small>
+          <ul class="pw-rules" id="mPwRules" aria-live="polite" hidden>
+            <li data-rule="length"><span class="material-symbols-outlined" aria-hidden="true">radio_button_unchecked</span><span data-i18n="profile.rule_length"></span></li>
+            <li data-rule="letter"><span class="material-symbols-outlined" aria-hidden="true">radio_button_unchecked</span><span data-i18n="profile.rule_letter"></span></li>
+            <li data-rule="digit"><span class="material-symbols-outlined" aria-hidden="true">radio_button_unchecked</span><span data-i18n="profile.rule_digit"></span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary" data-i18n="common.save"></button>
+        <button type="button" class="btn btn-ghost" onclick="closeModal('userModal')" data-i18n="common.cancel"></button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Delete-user confirm modal — replaces native confirm(). Cancel is default-focused. -->
+<div class="modal-backdrop" id="userDeleteModal" role="dialog" aria-modal="true" aria-labelledby="userDeleteTitle">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title" id="userDeleteTitle" data-i18n="admin.confirm_delete_title"></div>
+      <button class="modal-close" onclick="closeModal('userDeleteModal')" data-i18n-aria-label="common.close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p data-i18n="admin.confirm_delete_body"></p>
+      <p class="user-delete-name" id="userDeleteName"></p>
+      <!-- Typed-confirmation surfaces only when deleting an admin-role user. -->
+      <div class="field" id="userDeleteTypedWrap" hidden>
+        <label for="userDeleteTyped">
+          <span data-i18n="admin.delete_typed_prompt"></span>
+          <strong id="userDeleteTypedExpected" class="user-delete-typed-expected"></strong>
+        </label>
+        <input type="text" id="userDeleteTyped" autocomplete="off" oninput="onUserDeleteTyped()">
+      </div>
+    </div>
+    <div class="modal-footer user-delete-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('userDeleteModal')" data-default-focus data-i18n="common.cancel"></button>
+      <button type="button" class="btn btn-danger" id="userDeleteConfirm" onclick="confirmUserDelete()" data-i18n="admin.delete_btn"></button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}?v=flat51"></script>
+<script>
+// Snapshot the current admin's user_id once — used by render() to suppress the
+// self-delete button. Pulled via |tojson so a null user.id surfaces as `null`,
+// not an empty string that would break the JS expression.
+const CURRENT_USER_ID = {{ user.id|tojson }};
+const CURRENT_ROLE   = {{ user.role|tojson }};
+
+// Role hierarchy mirror of app/auth.py:_CAN_CREATE_ROLES — the JS uses this
+// to (a) filter the role picker on user-create / edit, (b) hide the Edit /
+// Delete / Activate / Deactivate buttons on rows the actor isn't allowed
+// to manage. Backend enforces the same rules; this is UX, not security.
+const CAN_CREATE_ROLES = {
+  admin:     ["admin","manager","team_leader","dataentry","sales","marketing"],
+  manager:   ["team_leader","dataentry","sales","marketing"],
+  dataentry: ["team_leader","dataentry","sales","marketing"],
+};
+const ALLOWED_ROLES = CAN_CREATE_ROLES[CURRENT_ROLE] || [];
+function canManageRow(targetRole) {
+  return ALLOWED_ROLES.indexOf(targetRole) >= 0;
+}
+
+let users = [];
+let teams = [];
+let editingId = null;
+
+const ROLES = ["admin","manager","team_leader","marketing","dataentry","sales"];
+
+// Incremental render so a 200-user org doesn't pay a full table render up
+// front. The "Show more" sentinel below the table bumps this in PAGE chunks.
+const _USERS_PAGE = 50;
+let _usersRendered = _USERS_PAGE;
+let _usersScrollObs = null;
+
+// Status precedence for the new Online/Offline/Disabled/Pending column.
+// pending (signup awaiting approval) and disabled (admin-blocked) are sticky
+// regardless of last_seen — the user can't actually be using the app.
+function userStatus(u) {
+  if (u.approval_status === "pending") return "pending";
+  if (!u.active) return "disabled";
+  return u.is_online ? "online" : "offline";
+}
+
+const _STATUS_BADGE_META = {
+  online:   { cls: "badge-excellent", icon: "circle",            key: "common.online" },
+  offline:  { cls: "badge-pending",   icon: "circle",            key: "common.offline" },
+  disabled: { cls: "badge-bad",       icon: "block",             key: "common.disabled" },
+  pending:  { cls: "badge-pending",   icon: "hourglass_top",     key: "admin.status_pending" },
+};
+
+function statusBadge(u) {
+  const s = userStatus(u);
+  const m = _STATUS_BADGE_META[s] || _STATUS_BADGE_META.offline;
+  return `<span class="badge ${m.cls}" style="display:inline-flex;align-items:center;gap:4px">
+    <span class="material-symbols-outlined" aria-hidden="true" style="font-size:13px${s==='online'?';color:#10b981':''}">${m.icon}</span>
+    <span>${t(m.key)}</span>
+  </span>`;
+}
+
+function onAdminSearchInput() {
+  const sb = document.getElementById("searchBox");
+  const clr = document.getElementById("adminSearchClear");
+  if (clr) clr.hidden = !(sb && sb.value.length);
+  render();
+}
+
+function clearAdminSearch() {
+  const sb = document.getElementById("searchBox");
+  if (sb) { sb.value = ""; sb.focus(); }
+  onAdminSearchInput();
+}
+
+async function loadUsers() {
+  try {
+    const [u, ts, pending] = await Promise.all([
+      api("/api/users"),
+      teams.length ? Promise.resolve(teams) : api("/api/teams").catch(() => []),
+      api("/api/users/pending").catch(() => []),
+    ]);
+    users = u;
+    teams = ts || [];
+    pendingRequests = pending || [];
+    populateTeamFilter();
+    renderTilesAndCharts();
+    renderPending();
+    render();
+  }
+  catch (e) { toastError(e); }
+}
+
+let pendingRequests = [];
+
+const _SIGNUP_ROLES = ["sales", "marketing", "team_leader", "dataentry"];
+
+function renderPending() {
+  const section = document.getElementById("pendingSection");
+  const list = document.getElementById("pendingList");
+  const countEl = document.getElementById("pendingCount");
+  if (!section || !list) return;
+  const rows = pendingRequests || [];
+  countEl.textContent = String(rows.length);
+  // Hide the whole card when empty so the admin page doesn't carry a dead
+  // section on it. Auto-expand once at least one request lands so it's
+  // immediately actionable without a click.
+  if (!rows.length) {
+    section.hidden = true;
+    section.open = false;
+    list.innerHTML = "";
+    return;
+  }
+  section.hidden = false;
+  section.open = true;
+  list.innerHTML = rows.map(p => {
+    const initial = escapeHTML((p.full_name || "?")[0]);
+    const roleOpts = _SIGNUP_ROLES
+      .filter(r => canManageRow(r))
+      .map(r => `<option value="${r}"${r === p.role ? " selected" : ""}>${t("role." + r)}</option>`)
+      .join("");
+    const created = p.created_at ? new Date(p.created_at).toLocaleString(getLang() === "ar" ? "ar-EG" : "en-US") : "";
+    return `
+      <div class="pending-row">
+        <div class="row-actor">
+          <div class="avatar avatar-sm">${initial}</div>
+          <div>
+            <div class="row-actor-name">${escapeHTML(p.full_name || "—")}</div>
+            <div class="row-actor-sub">@${escapeHTML(p.username)} · ${escapeHTML(p.email || "")}</div>
+            ${created ? `<div class="row-actor-sub" style="font-size:10px">${escapeHTML(created)}</div>` : ""}
+          </div>
+        </div>
+        <div class="pending-row-controls">
+          <select class="pending-role-select" data-pid="${p.id}" aria-label="${t("admin.role")}">
+            ${roleOpts || `<option value="${p.role}">${t("role." + p.role)}</option>`}
+          </select>
+          <button class="btn btn-sm btn-primary" onclick="approvePending(${p.id})">
+            <span class="material-symbols-outlined" aria-hidden="true">check</span>
+            <span>${t("admin.approve")}</span>
+          </button>
+          <button class="btn btn-sm btn-danger" onclick="rejectPending(${p.id})">
+            <span class="material-symbols-outlined" aria-hidden="true">close</span>
+            <span>${t("admin.reject")}</span>
+          </button>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+async function approvePending(id) {
+  const sel = document.querySelector(`.pending-role-select[data-pid="${id}"]`);
+  const role = sel ? sel.value : null;
+  try {
+    const res = await api(`/api/users/${id}/approve`, { method: "POST", body: { role } });
+    // The backend returns email_sent so we can warn the admin when SMTP /
+    // Resend isn't configured — otherwise the user would silently never get
+    // a confirmation email.
+    if (res && res.email_sent === false) {
+      toast(t("admin.approved_email_unconfigured"), "warn");
+    } else {
+      toast(t("admin.approved_toast"), "success");
+    }
+    loadUsers();
+  } catch (e) { toastError(e); }
+}
+
+async function rejectPending(id) {
+  try {
+    const res = await api(`/api/users/${id}/reject`, { method: "POST" });
+    if (res && res.email_sent === false) {
+      toast(t("admin.rejected_email_unconfigured"), "warn");
+    } else {
+      toast(t("admin.rejected_toast"), "success");
+    }
+    loadUsers();
+  } catch (e) { toastError(e); }
+}
+
+function populateTeamFilter() {
+  const sel = document.getElementById("teamFilter");
+  if (!sel) return;
+  const prev = sel.value;
+  const opts = [
+    `<option value="">${t("common.all")}</option>`,
+    `<option value="none">${t("filters.no_team")}</option>`,
+  ];
+  teams.forEach(team => {
+    opts.push(`<option value="${team.id}">${escapeHTML(team.name)}</option>`);
+  });
+  sel.innerHTML = opts.join("");
+  if (prev) sel.value = prev;
+}
+
+function renderTilesAndCharts() {
+  const total = users.length;
+  const online   = users.filter(u => userStatus(u) === "online").length;
+  const offline  = users.filter(u => userStatus(u) === "offline").length;
+  const disabled = users.filter(u => userStatus(u) === "disabled").length;
+  const pending  = users.filter(u => userStatus(u) === "pending").length;
+  const teamCount = new Set(users.filter(u => u.team_id).map(u => u.team_id)).size;
+  const noTeam = users.filter(u => u.team_id == null && (u.role === 'sales' || u.role === 'team_leader')).length;
+
+  document.getElementById("adminTiles").innerHTML = `
+    <div class="kpi-tile tile-brand span-3 is-clickable" id="atile_total" data-i18n-aria-label="dash.tile_action_users" tabindex="0" role="button">
+      <div class="kpi-tile-head"><div class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">manage_accounts</span></div><div class="kpi-tile-label">${t("admin.title")}</div></div>
+      <div class="kpi-tile-value">${total}</div>
+    </div>
+    <div class="kpi-tile tile-accent span-3 is-clickable" id="atile_online" data-i18n-aria-label="dash.tile_action_active" tabindex="0" role="button">
+      <div class="kpi-tile-head"><div class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">circle</span></div><div class="kpi-tile-label">${t("common.online")}</div></div>
+      <div class="kpi-tile-value">${online}</div>
+      <div class="kpi-tile-sub">${total ? Math.round(online/total*100) : 0}%</div>
+    </div>
+    <div class="kpi-tile tile-warm span-3 is-clickable" id="atile_pending" tabindex="0" role="button">
+      <div class="kpi-tile-head"><div class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">hourglass_top</span></div><div class="kpi-tile-label">${t("admin.status_pending")}</div></div>
+      <div class="kpi-tile-value">${pending}</div>
+    </div>
+    <div class="kpi-tile tile-coral span-3 is-clickable" id="atile_no_team" data-i18n-aria-label="dash.tile_action_no_team" tabindex="0" role="button">
+      <div class="kpi-tile-head"><div class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">warning</span></div><div class="kpi-tile-label">${t("filters.no_team")}</div></div>
+      <div class="kpi-tile-value">${noTeam}</div>
+    </div>
+  `;
+  _wireAdminTileClicks();
+
+  if (typeof Plotly === 'undefined') return;
+
+  // Roles donut
+  const roleCounts = ROLES.map(r => users.filter(u => u.role === r).length);
+  const roleColors = [
+    Charts.COLORS.secondary,    // admin
+    Charts.COLORS.info,         // manager
+    Charts.COLORS.accent2,      // team_leader
+    Charts.COLORS.warning2,     // marketing
+    Charts.COLORS.brand2,       // dataentry
+    Charts.COLORS.brand,        // sales
+  ];
+  const fLabels = [], fValues = [], fColors = [];
+  ROLES.forEach((r, i) => {
+    if (roleCounts[i] > 0) {
+      fLabels.push(t("role." + r));
+      fValues.push(roleCounts[i]);
+      fColors.push(roleColors[i]);
+    }
+  });
+  if (fValues.length) {
+    Charts.drawDonut("chartRoles", { labels: fLabels, values: fValues, colors: fColors }, { centerText: total + "" });
+  }
+
+  // Online / Offline / Disabled / Pending split
+  const sLabels = [], sValues = [], sColors = [];
+  if (online)   { sLabels.push(t("common.online"));         sValues.push(online);   sColors.push(Charts.COLORS.accent2); }
+  if (offline)  { sLabels.push(t("common.offline"));        sValues.push(offline);  sColors.push(Charts.COLORS.info); }
+  if (disabled) { sLabels.push(t("common.disabled"));       sValues.push(disabled); sColors.push(Charts.COLORS.danger2); }
+  if (pending)  { sLabels.push(t("admin.status_pending"));  sValues.push(pending);  sColors.push(Charts.COLORS.warning2); }
+  if (sValues.length) {
+    Charts.drawDonut("chartStatus", { labels: sLabels, values: sValues, colors: sColors }, { centerText: total + "" });
+  }
+}
+
+function resetFilters() {
+  document.getElementById("roleFilter").value = "all";
+  document.getElementById("statusFilter").value = "all";
+  document.getElementById("teamFilter").value = "";
+  document.getElementById("searchBox").value = "";
+  render();
+}
+
+function clearChip(id, val) {
+  const el = document.getElementById(id);
+  if (el) { el.value = val; render(); }
+}
+
+function renderChips() {
+  const role = document.getElementById("roleFilter").value;
+  const status = document.getElementById("statusFilter").value;
+  const teamVal = document.getElementById("teamFilter").value;
+  const search = document.getElementById("searchBox").value.trim();
+  const chips = [];
+  if (role && role !== "all")
+    chips.push(`<span class="pf-chip">${t("admin.role")}: ${escapeHTML(t("role." + role))}<button onclick="clearChip('roleFilter','all')">✕</button></span>`);
+  if (status && status !== "all") {
+    const lblMap = {
+      online:   t("common.online"),
+      offline:  t("common.offline"),
+      disabled: t("common.disabled"),
+      pending:  t("admin.status_pending"),
+    };
+    const lbl = lblMap[status] || status;
+    chips.push(`<span class="pf-chip">${t("admin.filter_status")}: ${escapeHTML(lbl)}<button onclick="clearChip('statusFilter','all')">✕</button></span>`);
+  }
+  if (teamVal) {
+    let label = t("filters.no_team");
+    if (teamVal !== "none") {
+      const tm = teams.find(x => String(x.id) === teamVal);
+      label = tm ? tm.name : teamVal;
+    }
+    chips.push(`<span class="pf-chip">${t("filters.team")}: ${escapeHTML(label)}<button onclick="clearChip('teamFilter','')">✕</button></span>`);
+  }
+  if (search)
+    chips.push(`<span class="pf-chip">${t("common.search")}: ${escapeHTML(search)}<button onclick="clearChip('searchBox','')">✕</button></span>`);
+  document.getElementById("chipsRow").innerHTML = chips.join("");
+}
+
+function render() {
+  const role = document.getElementById("roleFilter").value;
+  const status = document.getElementById("statusFilter").value;
+  const teamVal = document.getElementById("teamFilter").value;
+  const search = (document.getElementById("searchBox").value || "").trim().toLowerCase();
+
+  let rows = [...users];
+  if (role !== "all") rows = rows.filter(u => u.role === role);
+  if (status !== "all") {
+    rows = rows.filter(u => {
+      const s = userStatus(u);
+      return s === status;
+    });
+  }
+  if (teamVal === "none") rows = rows.filter(u => u.team_id == null);
+  else if (teamVal) rows = rows.filter(u => String(u.team_id || "") === teamVal);
+  if (search) rows = rows.filter(u =>
+    (u.full_name || "").toLowerCase().includes(search) ||
+    (u.username || "").toLowerCase().includes(search) ||
+    (u.email || "").toLowerCase().includes(search) ||
+    (u.team_name || "").toLowerCase().includes(search));
+
+  renderChips();
+  // Reset incremental-render window: any filter/search/page action starts at the top.
+  _usersRendered = _USERS_PAGE;
+  _filteredUsers = rows;
+
+  const tbody = document.getElementById("tbody");
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="table-empty">
+      <div>${t("admin.no_users")}</div>
+      <button type="button" class="btn btn-sm" style="margin-top:14px" onclick="resetFilters()">
+        <span class="material-symbols-outlined" aria-hidden="true">restart_alt</span>
+        <span>${t("pf.clear_filters")}</span>
+      </button>
+    </td></tr>`;
+    return;
+  }
+
+  const display = rows.slice(0, _usersRendered);
+  tbody.innerHTML = display.map(u => `<tr>
+    <td>
+      <div class="row-actor">
+        <div class="avatar avatar-sm${u.avatar_url ? ' avatar-img' : ''}">${
+          u.avatar_url
+            ? `<img src="${escapeHTML(u.avatar_url)}" alt="">`
+            : escapeHTML((u.full_name || "?")[0])
+        }</div>
+        <div>
+          <div class="row-actor-name">${escapeHTML(u.full_name)}</div>
+          <div class="row-actor-sub">@${escapeHTML(u.username)}</div>
+        </div>
+      </div>
+    </td>
+    <td><span class="badge badge-role-${u.role}">${t("role." + u.role)}</span></td>
+    <td class="admin-cell-sub">${
+      u.team_name
+        ? (u.role === 'sales' && u.team_leader_name
+            ? escapeHTML(u.team_name) + ` <span class="text-muted" style="font-size:11px">· ${escapeHTML(u.team_leader_name)}</span>`
+            : escapeHTML(u.team_name))
+        : (u.role === 'sales'
+            ? `<span class="badge badge-pending" title="${escapeHTML(t('tl_eval.unassigned_hint'))}">${t('common.unassigned')}</span>`
+            : '—')
+    }</td>
+    <td class="admin-cell-sub">
+      ${escapeHTML(u.email || "—")}${u.phone ? "<br>" + escapeHTML(u.phone) : ""}
+    </td>
+    <td>${statusBadge(u)}</td>
+    <td>
+      <div class="flex gap-1 admin-row-actions">
+        ${canManageRow(u.role) ? (
+          u.approval_status === "pending"
+            ? `<button class="btn btn-sm btn-primary" onclick="approvePending(${u.id})">${t("admin.approve")}</button>
+               <button class="btn btn-sm btn-danger" onclick="rejectPending(${u.id})">${t("admin.reject")}</button>`
+            : `<button class="btn btn-sm btn-primary" onclick="openEdit(${u.id})">${t("common.edit")}</button>
+               <button class="btn btn-sm" onclick="toggleActive(${u.id}, ${!u.active})">
+                 ${u.active ? t("admin.deactivate") : t("admin.activate")}
+               </button>
+               ${u.id !== CURRENT_USER_ID
+                 ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">${t("common.delete")}</button>`
+                 : ''}`
+        ) : `<span class="text-muted" style="font-size:11px">—</span>`}
+      </div>
+    </td>
+  </tr>`).join("");
+  applyLang(true);
+  _wireUsersInfiniteScroll(tbody, rows.length);
+}
+
+let _filteredUsers = [];
+
+// Add a sentinel <tr> below the rendered slice. When it scrolls into view,
+// bump _usersRendered and re-render so the user gets infinite scroll without
+// hitting the server again. Skipped when everything is already on screen.
+function _wireUsersInfiniteScroll(tbody, totalCount) {
+  if (_usersScrollObs) {
+    _usersScrollObs.disconnect();
+    _usersScrollObs = null;
+  }
+  if (_usersRendered >= totalCount) return;
+  if (typeof IntersectionObserver === "undefined") return;
+  const sentinel = document.createElement("tr");
+  sentinel.className = "admin-scroll-sentinel";
+  sentinel.innerHTML = `<td colspan="6" style="padding:14px;text-align:center;color:var(--text-muted);font-size:12px">…</td>`;
+  tbody.appendChild(sentinel);
+  _usersScrollObs = new IntersectionObserver((entries) => {
+    if (!entries.some(e => e.isIntersecting)) return;
+    _usersRendered = Math.min(_usersRendered + _USERS_PAGE, _filteredUsers.length);
+    render();
+  }, { rootMargin: "300px 0px" });
+  _usersScrollObs.observe(sentinel);
+}
+
+function escapeHTML(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
+    {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]
+  ));
+}
+
+// Hide role <option>s the actor isn't allowed to assign. Idempotent —
+// safe to call before every modal open.
+function _filterRoleOptions(currentRoleValue) {
+  const sel = document.getElementById("mRole");
+  if (!sel) return;
+  let firstAllowed = null;
+  [...sel.options].forEach(opt => {
+    const allowed = canManageRow(opt.value);
+    opt.hidden = !allowed;
+    opt.disabled = !allowed;
+    if (allowed && firstAllowed === null) firstAllowed = opt.value;
+  });
+  // If the currently selected option became hidden, snap to the first allowed one.
+  if (sel.value && sel.options[sel.selectedIndex]?.hidden) {
+    sel.value = currentRoleValue && canManageRow(currentRoleValue) ? currentRoleValue : (firstAllowed || "");
+  }
+}
+
+function openNew() {
+  editingId = null;
+  document.getElementById("modalTitle").textContent = t("admin.new_user");
+  document.getElementById("userForm").reset();
+  document.getElementById("mPassword").required = true;
+  document.getElementById("mPwHint").textContent = t("admin.pw_hint_new");
+  document.getElementById("mError").classList.remove("show");
+  // New-user: rules visible from the start so admin sees the contract.
+  document.getElementById("mPwRules").hidden = false;
+  refreshAdminPwRules();
+  _filterRoleOptions(null);
+  applyLang(true);
+  openModal("userModal");
+}
+
+function openEdit(id) {
+  const u = users.find(x => x.id === id);
+  if (!u) return;
+  editingId = id;
+  document.getElementById("modalTitle").textContent = t("admin.edit_user") + ": " + u.full_name;
+  document.getElementById("mName").value = u.full_name || "";
+  document.getElementById("mUsername").value = u.username || "";
+  document.getElementById("mRole").value = u.role || "sales";
+  _filterRoleOptions(u.role);
+  document.getElementById("mEmail").value = u.email || "";
+  document.getElementById("mPhone").value = u.phone || "";
+  document.getElementById("mPassword").value = "";
+  document.getElementById("mPassword").required = false;
+  document.getElementById("mPwHint").textContent = t("admin.pw_hint_edit");
+  document.getElementById("mError").classList.remove("show");
+  // Edit flow: rules surface only once the admin starts typing a new password.
+  document.getElementById("mPwRules").hidden = true;
+  refreshAdminPwRules();
+  applyLang(true);
+  openModal("userModal");
+}
+
+function refreshAdminPwRules() {
+  const v = document.getElementById("mPassword").value;
+  const rules = {
+    length: v.length >= 8,
+    letter: /[A-Za-z]/.test(v),
+    digit:  /\d/.test(v),
+  };
+  document.querySelectorAll("#mPwRules li").forEach(li => {
+    const r = li.getAttribute("data-rule");
+    const passed = rules[r];
+    li.classList.toggle("passed", passed);
+    const icon = li.querySelector(".material-symbols-outlined");
+    if (icon) icon.textContent = passed ? "check_circle" : "radio_button_unchecked";
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const pw = document.getElementById("mPassword");
+  if (!pw) return;
+  pw.addEventListener("input", () => {
+    // In edit flow: hide the checklist when the field is empty (admin not changing pw).
+    if (editingId) document.getElementById("mPwRules").hidden = !pw.value;
+    refreshAdminPwRules();
+  });
+});
+
+document.getElementById("userForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const mErr = document.getElementById("mError");
+  mErr.classList.remove("show");
+
+  const name = document.getElementById("mName").value.trim();
+  const username = document.getElementById("mUsername").value.trim().toLowerCase();
+  const email = document.getElementById("mEmail").value.trim().toLowerCase();
+  const phone = document.getElementById("mPhone").value.trim();
+  const pw = document.getElementById("mPassword").value;
+
+  if (!name || !username || !email) {
+    mErr.textContent = t("errors.required_fields_missing");
+    mErr.classList.add("show"); return;
+  }
+  if (!/^[a-z0-9_.]{3,50}$/.test(username)) {
+    mErr.textContent = t("errors.username_too_short");
+    mErr.classList.add("show"); return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    mErr.textContent = t("errors.invalid_email");
+    mErr.classList.add("show"); return;
+  }
+  if (phone && !/^\+?[0-9][0-9\s\-]{6,19}$/.test(phone)) {
+    mErr.textContent = t("errors.invalid_phone");
+    mErr.classList.add("show"); return;
+  }
+  if (pw && (pw.length < 8 || !/[A-Za-z]/.test(pw) || !/\d/.test(pw))) {
+    mErr.textContent = t("errors.weak_password");
+    mErr.classList.add("show"); return;
+  }
+
+  const body = {
+    full_name: name,
+    username,
+    role: document.getElementById("mRole").value,
+    email,
+    phone,
+  };
+  if (pw) body.password = pw;
+
+  try {
+    if (editingId) {
+      await api(`/api/users/${editingId}`, { method: "PUT", body });
+    } else {
+      await api("/api/users", { method: "POST", body });
+    }
+    toast(t("common.saved"), "success");
+    closeModal("userModal");
+    loadUsers();
+  } catch (err) {
+    mErr.textContent = tError(err);
+    mErr.classList.add("show");
+  }
+});
+
+// Activate/deactivate is reversible — no blocking confirm. We perform the action,
+// then surface a toast with a one-click "Undo" that flips it back.
+async function toggleActive(id, activate) {
+  const u = users.find(x => x.id === id);
+  const userName = u ? u.full_name : "";
+  try {
+    await api(`/api/users/${id}/${activate ? "activate" : "deactivate"}`, { method: "POST" });
+    const msg = activate
+      ? `${t("common.saved")} — ${userName}`
+      : `${t("admin.deactivated")} — ${userName}`;
+    // Offer Undo only on deactivate (the consequential direction).
+    if (!activate) {
+      toastWithAction(msg, t("admin.undo_reactivate"), async () => {
+        try {
+          await api(`/api/users/${id}/activate`, { method: "POST" });
+          loadUsers();
+        } catch (e) { toastError(e); }
+      });
+    } else {
+      toast(msg, "success");
+    }
+    loadUsers();
+  } catch (e) { toastError(e); }
+}
+
+// Delete is irreversible — surfaces a proper modal. Admin-role users require
+// typed confirmation (must type the username) on top of the modal.
+let _pendingDeleteUserId = null;
+function deleteUser(id) {
+  const u = users.find(x => x.id === id);
+  if (!u) return;
+  _pendingDeleteUserId = id;
+  document.getElementById("userDeleteName").textContent = u.full_name + " · @" + u.username;
+
+  const isAdmin = u.role === "admin";
+  const wrap = document.getElementById("userDeleteTypedWrap");
+  const typed = document.getElementById("userDeleteTyped");
+  const btn = document.getElementById("userDeleteConfirm");
+  if (isAdmin) {
+    wrap.hidden = false;
+    document.getElementById("userDeleteTypedExpected").textContent = u.username;
+    typed.value = "";
+    btn.disabled = true;
+  } else {
+    wrap.hidden = true;
+    btn.disabled = false;
+  }
+  openModal("userDeleteModal");
+}
+
+function onUserDeleteTyped() {
+  const u = users.find(x => x.id === _pendingDeleteUserId);
+  if (!u) return;
+  const typed = document.getElementById("userDeleteTyped").value.trim();
+  document.getElementById("userDeleteConfirm").disabled = (typed !== u.username);
+}
+
+async function confirmUserDelete() {
+  if (!_pendingDeleteUserId) { closeModal("userDeleteModal"); return; }
+  const id = _pendingDeleteUserId;
+  try {
+    await api(`/api/users/${id}`, { method: "DELETE" });
+    closeModal("userDeleteModal");
+    toast(t("common.deleted"), "success");
+    _pendingDeleteUserId = null;
+    loadUsers();
+  } catch (e) {
+    closeModal("userDeleteModal");
+    toastError(e);
+  }
+}
+
+function onLangChange() { renderTilesAndCharts(); renderPending(); render(); }
+
+// Action 2 — admin tile click actions.
+function _wireAdminTileClicks() {
+  const wire = (id, handler) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.onclick = handler;
+    el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); } };
+  };
+  wire('atile_total', () => {
+    // Clear all filters → show every user.
+    resetFilters();
+    document.querySelector('.table-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  wire('atile_online', () => {
+    document.getElementById('statusFilter').value = 'online';
+    document.getElementById('roleFilter').value = 'all';
+    render();
+    document.querySelector('.table-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  wire('atile_pending', () => {
+    document.getElementById('statusFilter').value = 'pending';
+    document.getElementById('roleFilter').value = 'all';
+    render();
+    document.querySelector('.table-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  wire('atile_no_team', () => {
+    document.getElementById('teamFilter').value = 'none';
+    render();
+    document.querySelector('.table-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
+loadUsers();
+</script>
+{% endblock %}

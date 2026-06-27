@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-container-low": "#f1f3ff",
+                      "on-tertiary-container": "#f3fffd",
+                      "on-surface-variant": "#464653",
+                      "secondary": "#884f41",
+                      "primary-container": "#6067df",
+                      "surface-container": "#ebedfa",
+                      "surface-container-high": "#e5e7f4",
+                      "on-error": "#ffffff",
+                      "on-error-container": "#93000a",
+                      "primary-fixed-dim": "#bfc2ff",
+                      "on-tertiary": "#ffffff",
+                      "tertiary-fixed": "#65f8ed",
+                      "surface-bright": "#faf9ff",
+                      "surface-tint": "#4950c7",
+                      "surface-container-lowest": "#ffffff",
+                      "on-primary-container": "#fffbff",
+                      "on-secondary": "#ffffff",
+                      "primary-fixed": "#e0e0ff",
+                      "outline-variant": "#c6c5d6",
+                      "on-primary": "#ffffff",
+                      "on-primary-fixed": "#02006d",
+                      "error": "#ba1a1a",
+                      "inverse-surface": "#2d303a",
+                      "surface-dim": "#d7d9e6",
+                      "error-container": "#ffdad6",
+                      "secondary-fixed-dim": "#ffb4a2",
+                      "on-secondary-container": "#7a4336",
+                      "primary": "#474dc5",
+                      "tertiary-container": "#00837c",
+                      "inverse-primary": "#bfc2ff",
+                      "secondary-fixed": "#ffdad2",
+                      "secondary-container": "#ffb4a2",
+                      "surface-variant": "#e0e2ef",
+                      "tertiary-fixed-dim": "#40dcd1",
+                      "on-tertiary-fixed-variant": "#00504b",
+                      "on-surface": "#181b24",
+                      "on-primary-fixed-variant": "#3035af",
+                      "background": "#faf9ff",
+                      "outline": "#767685",
+                      "on-secondary-fixed": "#360e05",
+                      "on-secondary-fixed-variant": "#6c382b",
+                      "surface": "#faf9ff",
+                      "tertiary": "#006762",
+                      "on-tertiary-fixed": "#00201e",
+                      "inverse-on-surface": "#eef0fd",
+                      "surface-container-highest": "#e0e2ef",
+                      "on-background": "#181b24"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "card-padding": "20px",
+                      "unit": "4px",
+                      "gutter": "24px",
+                      "container-margin": "32px",
+                      "element-gap": "12px"
+              },
+              "fontFamily": {
+                      "body-lg": ["Inter"],
+                      "label-caps": ["Inter"],
+                      "body-sm": ["Inter"],
+                      "headline-xl": ["Inter"],
+                      "headline-md": ["Inter"],
+                      "data-num": ["Inter"]
+              },
+              "fontSize": {
+                      "body-lg": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "label-caps": ["12px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                      "body-sm": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                      "headline-xl": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "headline-md": ["20px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                      "data-num": ["24px", {"lineHeight": "1", "letterSpacing": "-0.01em", "fontWeight": "600"}]
+              }
+            },
+          },
+        }
+      </script>
+<style>
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 10px 30px rgba(124, 131, 253, 0.1);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background font-body-lg text-on-background min-h-screen">
+<!-- TopNavBar -->
+<header class="bg-white/70 backdrop-blur-xl border-b border-white/40 shadow-[0_10px_30px_rgba(124,131,253,0.1)] docked full-width top-0 sticky z-50">
+<div class="flex justify-between items-center px-8 h-16 w-full max-w-[1920px] mx-auto">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold tracking-tighter text-indigo-600 dark:text-indigo-300">Ain Real Estate</span>
+<nav class="hidden md:flex gap-6">
+<a class="text-slate-500 dark:text-slate-400 hover:text-indigo-400 transition-colors font-sans tracking-tight text-sm font-medium" href="#">Dashboard</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-indigo-400 transition-colors font-sans tracking-tight text-sm font-medium" href="#">Evaluation</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-indigo-400 transition-colors font-sans tracking-tight text-sm font-medium" href="#">Finance</a>
+<a class="text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500 pb-1 font-sans tracking-tight text-sm font-medium" href="#">Users</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-indigo-400 transition-colors font-sans tracking-tight text-sm font-medium" href="#">PropFinder</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 hover:bg-white/20 transition-all duration-300 rounded-full">
+<span class="material-symbols-outlined text-slate-500" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 hover:bg-white/20 transition-all duration-300 rounded-full">
+<span class="material-symbols-outlined text-slate-500" data-icon="settings">settings</span>
+</button>
+<img alt="User profile avatar" class="w-8 h-8 rounded-full border-2 border-primary/20" data-alt="Close up portrait of a professional male architect in a bright office with soft natural lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC8TM2HH6oZzdVzYeiueLVw_N9w_Wq-1Pj212x9wleWMAkOkXkfcyCFjpn1t7VRSnzIrGuxjWR1qqqys6loTeDf4SCAz-gaAuHviZZASut7BV2ItQXA4UXWugMrOy3rIP5mOvFK0Lmcs6-_DI-rBblne9TmWuB8TpHK2r43HHztRN5Dp6B6em5FwYYT1BPsX0Z3HUhgg_Q9xYwtFgyl8NIDdgxXF0Ms2q3rJjImXm-TgLDJHHYmIJnZud8q0LIUuhMzxsTcVULmTkPP"/>
+</div>
+</div>
+</header>
+<div class="flex">
+<!-- SideNavBar -->
+<aside class="h-[calc(100vh-64px)] w-64 sticky top-16 border-r border-white/30 bg-white/60 backdrop-blur-2xl shadow-xl shadow-indigo-500/5 hidden lg:flex flex-col p-4 gap-2">
+<div class="mb-8 px-2">
+<h2 class="text-lg font-black text-indigo-700">Ain Management</h2>
+<p class="text-xs text-slate-400 font-semibold uppercase tracking-widest">Premium Assets</p>
+</div>
+<div class="flex flex-col gap-1 flex-1">
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-500 hover:bg-white/40 hover:translate-x-1 transition-transform duration-200 font-sans text-sm font-semibold" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span>Overview</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-500 hover:bg-white/40 hover:translate-x-1 transition-transform duration-200 font-sans text-sm font-semibold" href="#">
+<span class="material-symbols-outlined" data-icon="domain">domain</span>
+<span>Portfolio</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-500 hover:bg-white/40 hover:translate-x-1 transition-transform duration-200 font-sans text-sm font-semibold" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span>Transactions</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-500 hover:bg-white/40 hover:translate-x-1 transition-transform duration-200 font-sans text-sm font-semibold" href="#">
+<span class="material-symbols-outlined" data-icon="query_stats">query_stats</span>
+<span>Market Analysis</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-500 hover:bg-white/40 hover:translate-x-1 transition-transform duration-200 font-sans text-sm font-semibold" href="#">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+<span>Reports</span>
+</a>
+</div>
+<div class="border-t border-white/20 pt-4 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-white/40 transition-all font-sans text-sm font-semibold" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span>Support</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-white/40 transition-all font-sans text-sm font-semibold text-error" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span>Logout</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 p-container-margin max-w-[1600px] mx-auto w-full">
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+<div>
+<h1 class="font-headline-xl text-headline-xl text-on-background">User Management</h1>
+<p class="font-body-sm text-body-sm text-outline">Manage administrative access and regional agent permissions</p>
+</div>
+<button class="bg-gradient-to-r from-primary to-primary-container text-on-primary-container px-6 py-3 rounded-xl font-headline-md text-body-lg flex items-center gap-2 shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform active:scale-95">
+<span class="material-symbols-outlined" data-icon="person_add">person_add</span>
+<span>Add User</span>
+</button>
+</div>
+<!-- Dashboard Analytics Quick-View (Bento Style) -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-gutter mb-8">
+<div class="glass-card p-card-padding rounded-xl col-span-1">
+<p class="font-label-caps text-label-caps text-outline mb-2">TOTAL USERS</p>
+<h3 class="font-data-num text-data-num text-on-background">1,284</h3>
+<div class="flex items-center gap-1 text-tertiary mt-2">
+<span class="material-symbols-outlined text-sm" data-icon="trending_up">trending_up</span>
+<span class="text-xs font-bold">+12% from last month</span>
+</div>
+</div>
+<div class="glass-card p-card-padding rounded-xl col-span-1">
+<p class="font-label-caps text-label-caps text-outline mb-2">ACTIVE SESSIONS</p>
+<h3 class="font-data-num text-data-num text-on-background">412</h3>
+<div class="flex items-center gap-1 text-indigo-500 mt-2">
+<span class="material-symbols-outlined text-sm" data-icon="bolt">bolt</span>
+<span class="text-xs font-bold">Real-time tracking</span>
+</div>
+</div>
+<div class="glass-card p-card-padding rounded-xl col-span-1">
+<p class="font-label-caps text-label-caps text-outline mb-2">ADMIN ROLES</p>
+<h3 class="font-data-num text-data-num text-on-background">24</h3>
+<div class="flex items-center gap-1 text-secondary mt-2">
+<span class="material-symbols-outlined text-sm" data-icon="shield">shield</span>
+<span class="text-xs font-bold">High priority accounts</span>
+</div>
+</div>
+<div class="glass-card p-card-padding rounded-xl col-span-1">
+<p class="font-label-caps text-label-caps text-outline mb-2">PENDING APPROVAL</p>
+<h3 class="font-data-num text-data-num text-on-background">7</h3>
+<div class="flex items-center gap-1 text-error mt-2">
+<span class="material-symbols-outlined text-sm" data-icon="pending_actions">pending_actions</span>
+<span class="text-xs font-bold">Requires attention</span>
+</div>
+</div>
+</div>
+<!-- Filters & Search -->
+<div class="glass-card p-6 rounded-xl mb-6 flex flex-wrap items-center gap-4">
+<div class="flex-1 min-w-[280px] relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline" data-icon="search">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-white/40 border border-white/60 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none font-body-sm transition-all" placeholder="Search by name, email or UID..." type="text"/>
+</div>
+<div class="flex gap-2 items-center">
+<select class="bg-white/40 border border-white/60 rounded-lg px-4 py-2 font-body-sm text-on-surface outline-none focus:ring-2 focus:ring-primary appearance-none pr-10 relative">
+<option>All Roles</option>
+<option>Administrator</option>
+<option>Agent</option>
+<option>Manager</option>
+</select>
+<select class="bg-white/40 border border-white/60 rounded-lg px-4 py-2 font-body-sm text-on-surface outline-none focus:ring-2 focus:ring-primary appearance-none pr-10 relative">
+<option>All Status</option>
+<option>Active</option>
+<option>Inactive</option>
+<option>Suspended</option>
+</select>
+<button class="flex items-center gap-2 bg-white/60 border border-white/80 px-4 py-2 rounded-lg font-body-sm text-on-surface hover:bg-white/80 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="filter_list">filter_list</span>
+                        More Filters
+                    </button>
+</div>
+</div>
+<!-- User Table -->
+<div class="glass-card rounded-2xl overflow-hidden">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-white/30 border-b border-white/40">
+<th class="px-6 py-4 font-label-caps text-label-caps text-outline">USER</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-outline">ROLE</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-outline">CONTACT INFO</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-outline">STATUS</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-outline">LAST ACTIVE</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-outline text-right">ACTIONS</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-white/20">
+<!-- Row 1 -->
+<tr class="hover:bg-white/40 transition-colors group">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<img alt="User" class="w-10 h-10 rounded-full border border-primary/10" data-alt="Modern professional headshot of a smiling woman with glasses in a minimalist bright setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDls_pS6XhLclkecdoskbGBhNf413XvnNfQ1GKiszHXmNLTCsf6wq31rB46AbQ3_AtqArG3cT1Vb7FNrQNRhFYdK2vYLvRAStzs6f34KFVdl6_lCYNQhcOZ0fXq2Ng6Jlhs4V3j2_NsXfSq1YWfbD3jMgliW2KCHvS_dAUsoJUIvyYZbkqsUfOrIa9bBUXBLV3CG2POkyOQvgsAGQGb6b52Cm4Tr61ZMpFIYuvNxjMbUZexbwwWYlqsk69lmn4_cqip0Rw8vq4oMgs1"/>
+<div>
+<p class="font-headline-md text-body-lg text-on-background leading-tight">Sarah Chen</p>
+<p class="text-xs text-outline font-medium tracking-tight">ID: AIN-92834</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold border border-primary/20">Administrator</span>
+</td>
+<td class="px-6 py-5">
+<div class="flex flex-col gap-1">
+<span class="text-body-sm text-on-surface flex items-center gap-1">
+<span class="material-symbols-outlined text-xs text-outline" data-icon="mail">mail</span>
+                                            sarah.c@ainrealestate.com
+                                        </span>
+<span class="text-body-sm text-outline flex items-center gap-1">
+<span class="material-symbols-outlined text-xs" data-icon="call">call</span>
+                                            +1 (555) 012-3456
+                                        </span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-tertiary-fixed-dim/20 text-tertiary">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse"></span>
+                                        Active
+                                    </span>
+</td>
+<td class="px-6 py-5">
+<p class="text-body-sm text-on-surface">2 mins ago</p>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="p-2 text-outline hover:text-primary transition-colors hover:bg-primary/5 rounded-lg">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-white/40 transition-colors group">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<img alt="User" class="w-10 h-10 rounded-full border border-primary/10" data-alt="Corporate portrait of a middle-aged man with short beard, warm confident expression, soft focus office background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA_nXqfL3PhqL3cAW0OyXxsB5N6WHzP_k3Iv3lCp8JDDEWzrSmJ6bk0UlW1WunROooeiVpfP4IgrGvhRgBAUFuTXX1gwbgzuswMLJFs8-PvCsVAUwTxxzPoXQwSbkRZf8uE3EtXQy8LVp6OeGlUOOfHfQyYnH1VxMgb0XvsgKZmxx9FJbrox3oSiWZAkG-taS4-26psH-oq1JDtflTlDzTK5OWRz0yeqyRh-vKV5kPo7hcag4ys5T36D6pZC_mssUQD0FOadnv5L8jD"/>
+<div>
+<p class="font-headline-md text-body-lg text-on-background leading-tight">Marcus Thorne</p>
+<p class="text-xs text-outline font-medium tracking-tight">ID: AIN-92835</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="px-3 py-1 bg-secondary-container/20 text-secondary rounded-full text-xs font-bold border border-secondary-container/30">Senior Agent</span>
+</td>
+<td class="px-6 py-5">
+<div class="flex flex-col gap-1">
+<span class="text-body-sm text-on-surface flex items-center gap-1">
+<span class="material-symbols-outlined text-xs text-outline" data-icon="mail">mail</span>
+                                            m.thorne@ainrealestate.com
+                                        </span>
+<span class="text-body-sm text-outline flex items-center gap-1">
+<span class="material-symbols-outlined text-xs" data-icon="call">call</span>
+                                            +1 (555) 987-6543
+                                        </span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-tertiary-fixed-dim/20 text-tertiary">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse"></span>
+                                        Active
+                                    </span>
+</td>
+<td class="px-6 py-5">
+<p class="text-body-sm text-on-surface">14 hours ago</p>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="p-2 text-outline hover:text-primary transition-colors hover:bg-primary/5 rounded-lg">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-white/40 transition-colors group">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<img alt="User" class="w-10 h-10 rounded-full border border-primary/10" data-alt="Professional headshot of a female tech manager, direct gaze, soft studio lighting, airy blue atmosphere" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCLUFryNIYPbMfnbxvz0efAfb8ZBwoEXioEH7id_rZ0n0XhPb9ca3S0IPYONm3-Rh2uk-Bj3jMtIhnmweSC0xsi7Xk2rrTe340d8PZOlLBmfiQ8LIWOt1jhj41Wy1rJ_54HSav-QPwxcxu3bI-8MaZxR_g5ZYn3rlKjsXyaBhZFD57wqOaYpo1ye-UskD5qcL8fHleopY3H1DSHHhOMGfdwUPEz3h3M6eHOycnaynywAExmI5aUr1hzx3XSNAf-BI_bgJLO8_wr6d4k"/>
+<div>
+<p class="font-headline-md text-body-lg text-on-background leading-tight">Elena Rodriguez</p>
+<p class="text-xs text-outline font-medium tracking-tight">ID: AIN-92836</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="px-3 py-1 bg-surface-container-highest text-outline rounded-full text-xs font-bold border border-outline-variant">Sales Manager</span>
+</td>
+<td class="px-6 py-5">
+<div class="flex flex-col gap-1">
+<span class="text-body-sm text-on-surface flex items-center gap-1">
+<span class="material-symbols-outlined text-xs text-outline" data-icon="mail">mail</span>
+                                            e.rodriguez@ainrealestate.com
+                                        </span>
+<span class="text-body-sm text-outline flex items-center gap-1">
+<span class="material-symbols-outlined text-xs" data-icon="call">call</span>
+                                            +1 (555) 234-5678
+                                        </span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-surface-variant text-outline">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+                                        Inactive
+                                    </span>
+</td>
+<td class="px-6 py-5">
+<p class="text-body-sm text-on-surface">3 days ago</p>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="p-2 text-outline hover:text-primary transition-colors hover:bg-primary/5 rounded-lg">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Footer / Pagination -->
+<div class="px-6 py-4 bg-white/20 border-t border-white/40 flex items-center justify-between">
+<p class="text-body-sm text-outline">Showing <span class="font-bold text-on-surface">1-3</span> of <span class="font-bold text-on-surface">1,284</span> users</p>
+<div class="flex items-center gap-2">
+<button class="p-2 rounded-lg border border-white/60 hover:bg-white/60 transition-colors disabled:opacity-50">
+<span class="material-symbols-outlined" data-icon="chevron_left">chevron_left</span>
+</button>
+<button class="w-10 h-10 rounded-lg bg-primary text-on-primary font-bold text-sm">1</button>
+<button class="w-10 h-10 rounded-lg border border-white/60 hover:bg-white/60 transition-colors font-bold text-sm">2</button>
+<button class="w-10 h-10 rounded-lg border border-white/60 hover:bg-white/60 transition-colors font-bold text-sm">3</button>
+<span class="text-outline mx-1">...</span>
+<button class="p-2 rounded-lg border border-white/60 hover:bg-white/60 transition-colors">
+<span class="material-symbols-outlined" data-icon="chevron_right">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Floating Action Button for Mobile -->
+<div class="md:hidden fixed bottom-6 right-6 z-50">
+<button class="w-14 h-14 rounded-full bg-primary text-on-primary shadow-2xl flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="person_add">person_add</span>
+</button>
+</div>
+</body></html>

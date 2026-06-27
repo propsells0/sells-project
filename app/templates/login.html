@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Ain Real Estate · Sign in{% endblock %}
+
+{% block main_class %}auth-main{% endblock %}
+
+{% block content %}
+<div class="auth-shell">
+  <!-- ── Left: brand storytelling panel (hidden on mobile) ─────────── -->
+  <aside class="auth-brand" aria-hidden="true">
+    <div class="auth-brand-bg">
+      <span class="auth-blob auth-blob-1"></span>
+      <span class="auth-blob auth-blob-2"></span>
+      <span class="auth-grid"></span>
+    </div>
+
+    <div class="auth-brand-content">
+      <div class="auth-brand-logo">
+        <span class="auth-brand-mark">{% include "_logo_mark.html" %}</span>
+        <span class="auth-brand-wordmark">
+          <span class="auth-brand-name">AIN</span>
+          <span class="auth-brand-tagline" data-i18n="brand.tagline">REAL ESTATE</span>
+        </span>
+      </div>
+
+      <h2 class="auth-brand-headline" data-i18n="auth.brand_headline"></h2>
+      <p class="auth-brand-sub" data-i18n="auth.brand_sub"></p>
+
+      <ul class="auth-brand-features">
+        <li>
+          <span class="material-symbols-outlined" aria-hidden="true">monitoring</span>
+          <span data-i18n="auth.feature_kpi"></span>
+        </li>
+        <li>
+          <span class="material-symbols-outlined" aria-hidden="true">domain</span>
+          <span data-i18n="auth.feature_propfinder"></span>
+        </li>
+        <li>
+          <span class="material-symbols-outlined" aria-hidden="true">groups</span>
+          <span data-i18n="auth.feature_teams"></span>
+        </li>
+      </ul>
+
+      <div class="auth-brand-trust">
+        <span class="material-symbols-outlined" aria-hidden="true">encrypted</span>
+        <span data-i18n="auth.secure_note"></span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Right: form panel ─────────────────────────────────────────── -->
+  <main class="auth-form-panel">
+    <header class="auth-form-header">
+      <a href="/" class="auth-form-mini-brand">
+        <span class="auth-form-mini-mark">{% include "_logo_mark.html" %}</span>
+        <span class="auth-form-mini-name">AIN <span>· REAL ESTATE</span></span>
+      </a>
+      <div class="auth-form-actions">
+        <button id="themeToggleBtn" class="theme-toggle" data-i18n-title="nav.theme_toggle" data-i18n-aria-label="nav.theme_toggle" title="Theme" aria-label="Theme">
+          <span class="material-symbols-outlined theme-toggle-icon-light" aria-hidden="true">light_mode</span>
+          <span class="material-symbols-outlined theme-toggle-icon-dark" aria-hidden="true">dark_mode</span>
+        </button>
+        <button id="langToggleBtn" class="lang-toggle" data-i18n-title="nav.language_toggle" title="Language">EN</button>
+      </div>
+    </header>
+
+    <section class="auth-form-card">
+      <h1 class="auth-form-title" data-i18n="auth.welcome_back"></h1>
+      <p class="auth-form-sub" data-i18n="auth.subtitle_login"></p>
+
+      <div class="error-msg" id="errorMsg" role="alert" aria-live="assertive"></div>
+
+      <form id="loginForm" novalidate>
+        <div class="field">
+          <label for="username" data-i18n="auth.username"></label>
+          <div class="auth-input-wrap">
+            <span class="material-symbols-outlined auth-input-icon" aria-hidden="true">person</span>
+            <input type="text" id="username" autocomplete="username" required maxlength="50" data-i18n-placeholder="auth.username_ph">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="password" data-i18n="auth.password"></label>
+          <div class="auth-input-wrap">
+            <span class="material-symbols-outlined auth-input-icon" aria-hidden="true">lock</span>
+            <input type="password" id="password" autocomplete="current-password" required maxlength="128" data-i18n-placeholder="auth.password_ph">
+            <button type="button" class="pw-toggle pw-toggle-flush" data-target="password" data-i18n-aria-label="common.show_password">
+              <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full auth-submit" id="loginBtn" data-i18n="auth.login_btn"></button>
+      </form>
+
+      <div class="auth-switch">
+        <a href="/forgot-password" data-i18n="auth.forgot"></a>
+        <span class="auth-switch-sep" aria-hidden="true">·</span>
+        <span data-i18n="auth.no_account"></span>
+        <a href="/register" data-i18n="auth.signup_link"></a>
+      </div>
+    </section>
+
+    <footer class="auth-form-footer">
+      <span data-i18n="auth.copyright"></span>
+    </footer>
+  </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const errorMsg = document.getElementById("errorMsg");
+const form = document.getElementById("loginForm");
+const btn = document.getElementById("loginBtn");
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  errorMsg.classList.remove("show");
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value;
+  if (!username || !password) {
+    errorMsg.textContent = t("errors.required_fields_missing");
+    errorMsg.classList.add("show");
+    return;
+  }
+  btn.disabled = true;
+  const prev = btn.textContent;
+  btn.innerHTML = `<span class="loading"></span><span style="margin-inline-start:8px">${t("common.loading")}</span>`;
+
+  try {
+    const data = await api("/api/auth/login", {
+      method: "POST",
+      body: { username, password },
+    });
+    window.location.href = data.redirect || "/";
+  } catch (err) {
+    errorMsg.textContent = tError(err);
+    errorMsg.classList.add("show");
+    btn.disabled = false;
+    btn.textContent = prev;
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+{% block title %}Ain KPI{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title" data-i18n="teams.title"></h1>
+    <p class="page-subtitle" data-i18n="teams.subtitle"></p>
+  </div>
+  <button class="btn btn-primary" onclick="openNew()" data-i18n="teams.add"></button>
+</div>
+
+<div id="teamsList"></div>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="teamModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle"></div>
+      <button class="modal-close" onclick="closeModal('teamModal')" data-i18n-aria-label="common.close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="error-msg" id="mError" role="alert" aria-live="assertive"></div>
+
+      <div class="field">
+        <label for="mName" data-i18n="teams.name"></label>
+        <input type="text" id="mName" required maxlength="100">
+      </div>
+      <div class="field">
+        <label for="mDesc">
+          <span data-i18n="teams.description"></span>
+          <small data-i18n="common.optional"></small>
+        </label>
+        <input type="text" id="mDesc" maxlength="200">
+      </div>
+      <div class="field">
+        <label for="mLeader" data-i18n="teams.leader"></label>
+        <select id="mLeader">
+          <option value="" data-i18n="teams.pick_leader"></option>
+        </select>
+      </div>
+      <fieldset class="field" id="membersFieldset">
+        <legend data-i18n="teams.members"></legend>
+        <div class="team-members-toolbar">
+          <div class="pf-search-input-wrap">
+            <span class="material-symbols-outlined pf-search-icon" aria-hidden="true">search</span>
+            <input type="text" id="memberSearch" oninput="filterMembers()" data-i18n-placeholder="teams.search_members_ph">
+            <button type="button" class="pf-search-clear" id="memberSearchClear" onclick="clearMemberSearch()" data-i18n-aria-label="common.clear" hidden>
+              <span class="material-symbols-outlined" aria-hidden="true">close</span>
+            </button>
+          </div>
+          <button type="button" class="btn btn-sm" onclick="selectAllVisibleMembers(true)" data-i18n="teams.select_all_visible"></button>
+          <button type="button" class="btn btn-sm btn-ghost" onclick="selectAllVisibleMembers(false)" data-i18n="teams.clear_all"></button>
+        </div>
+        <div id="membersList" class="team-members-list"></div>
+        <small class="text-muted" id="memberSelectedCount" aria-live="polite"></small>
+      </fieldset>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="saveTeam()" data-i18n="teams.save"></button>
+      <button class="btn btn-ghost" onclick="closeModal('teamModal')" data-i18n="common.cancel"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete-team confirm modal — replaces native confirm(). Cancel default-focused. -->
+<div class="modal-backdrop" id="teamDeleteModal" role="dialog" aria-modal="true" aria-labelledby="teamDeleteTitle">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div class="modal-title" id="teamDeleteTitle" data-i18n="teams.confirm_delete_title"></div>
+      <button class="modal-close" onclick="closeModal('teamDeleteModal')" data-i18n-aria-label="common.close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p data-i18n="teams.confirm_delete_body"></p>
+      <p class="user-delete-name" id="teamDeleteName"></p>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('teamDeleteModal')" data-default-focus data-i18n="common.cancel"></button>
+      <button type="button" class="btn btn-danger" onclick="confirmTeamDelete()" data-i18n="teams.delete_btn"></button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let teams = [];
+let allLeaders = [];
+let allSales = [];
+let editingId = null;
+
+async function loadAll() {
+  try {
+    [teams, allLeaders, allSales] = await Promise.all([
+      api("/api/teams"),
+      api("/api/users?role=team_leader&active_only=true"),
+      api("/api/users?role=sales&active_only=true"),
+    ]);
+    render();
+  } catch (e) { toastError(e); }
+}
+
+function escapeHTML(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
+    {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]
+  ));
+}
+
+function render() {
+  const container = document.getElementById("teamsList");
+
+  if (!teams.length) {
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon"><span class="material-symbols-outlined" aria-hidden="true">groups_off</span></div>
+      <div>${t("teams.no_teams")}</div>
+      <button type="button" class="btn btn-primary" style="margin-top:14px" onclick="openNew()">
+        <span class="material-symbols-outlined" aria-hidden="true">add</span>
+        <span>${t("teams.add")}</span>
+      </button>
+    </div>`;
+    return;
+  }
+
+  container.innerHTML = teams.map(team => {
+    const leaderName = team.leader_name || t("teams.no_leader");
+    const members = Array.isArray(team.members) ? team.members : [];
+    const cnt = team.member_count != null ? team.member_count : members.length;
+    const stackedAvatars = members.slice(0, 5).map(m =>
+      _avatarHTML(m, "avatar avatar-sm team-avatar-stacked", "")
+    ).join("");
+    const moreCount = cnt > 5 ? `<span class="team-avatar-more">+${cnt - 5}</span>` : "";
+    const leaderAvatar = team.leader_id
+      ? _avatarHTML({ full_name: leaderName, avatar_url: team.leader_avatar_url }, "avatar avatar-sm", "")
+      : "";
+
+    return `
+      <details class="card team-card" data-team-id="${team.id}">
+        <summary class="team-card-row" aria-label="${escapeHTML(team.name)}">
+          <div class="team-card-icon"><span class="material-symbols-outlined" aria-hidden="true">groups</span></div>
+          <div class="team-card-body">
+            <div class="team-card-name">${escapeHTML(team.name)}</div>
+            ${team.description ? `<div class="team-card-desc">${escapeHTML(team.description)}</div>` : ""}
+            <div class="team-card-meta">
+              <span class="team-card-leader-line">
+                ${leaderAvatar}
+                <span><span class="text-muted">${t("teams.leader")}:</span> <strong>${escapeHTML(leaderName)}</strong></span>
+              </span>
+              <span class="team-card-members-line">
+                <span class="team-avatars-stack">${stackedAvatars}${moreCount}</span>
+                <span><strong>${cnt}</strong> <span class="text-muted">${t("teams.members_count")}</span></span>
+              </span>
+            </div>
+          </div>
+          <div class="team-card-actions">
+            <button class="btn btn-sm btn-primary" type="button" onclick="event.preventDefault();event.stopPropagation();openEdit(${team.id})">${t("common.edit")}</button>
+            <button class="btn btn-sm btn-danger" type="button" onclick="event.preventDefault();event.stopPropagation();deleteTeam(${team.id})">${t("common.delete")}</button>
+            <span class="team-card-chev material-symbols-outlined" aria-hidden="true">expand_more</span>
+          </div>
+        </summary>
+        <div class="team-card-expand">
+          <div class="team-expand-title">${t("teams.members")} (${cnt})</div>
+          ${members.length
+            ? `<div class="team-expand-grid">
+                ${members.map(m => `
+                  <div class="team-expand-row">
+                    ${_avatarHTML(m, "avatar avatar-sm", "")}
+                    <div class="team-expand-meta">
+                      <div class="team-expand-name">${escapeHTML(m.full_name)}</div>
+                      <div class="team-expand-sub">@${escapeHTML(m.username)}</div>
+                    </div>
+                    ${m.email ? `<a class="team-expand-contact" href="mailto:${escapeHTML(m.email)}" title="${escapeHTML(m.email)}"><span class="material-symbols-outlined" aria-hidden="true">mail</span></a>` : ""}
+                  </div>
+                `).join("")}
+              </div>`
+            : `<div class="team-expand-empty">${t("teams.empty_members")}</div>`}
+        </div>
+      </details>`;
+  }).join("");
+}
+
+// Single source of truth for rendering an avatar — accepts a user-like
+// object ({full_name, avatar_url}) and returns either an <img> wrapper
+// or the initial-letter fallback. Used both in the team card list and
+// the expand panel below it.
+function _avatarHTML(user, classes, extraStyle) {
+  const initial = ((user && user.full_name) || "?").trim()[0] || "?";
+  const style = extraStyle ? ` style="${extraStyle}"` : "";
+  if (user && user.avatar_url) {
+    return `<div class="${classes} avatar-img"${style}><img src="${escapeHTML(user.avatar_url)}" alt=""></div>`;
+  }
+  return `<div class="${classes}"${style}>${escapeHTML(initial)}</div>`;
+}
+
+function buildLeaderOptions(selectedId) {
+  const sel = document.getElementById("mLeader");
+  sel.innerHTML = `<option value="">${t("teams.pick_leader")}</option>` +
+    allLeaders.map(u => `<option value="${u.id}" ${u.id == selectedId ? "selected" : ""}>${escapeHTML(u.full_name)}</option>`).join("");
+}
+
+function buildMembersCheckboxes(selectedIds) {
+  const box = document.getElementById("membersList");
+  if (!allSales.length) {
+    box.innerHTML = `<div class="text-muted text-sm">${t("teams.no_sales")}</div>`;
+    refreshMemberCount();
+    return;
+  }
+  // data-search holds lowercase haystack so filterMembers() can match without rebuild.
+  box.innerHTML = allSales.map(u => {
+    const hay = ((u.full_name || "") + " " + (u.username || "")).toLowerCase();
+    return `
+    <label class="team-member-row" data-search="${escapeHTML(hay)}">
+      <input type="checkbox" value="${u.id}" ${selectedIds.includes(u.id) ? "checked" : ""} onchange="refreshMemberCount()">
+      <span class="team-member-name">${escapeHTML(u.full_name)}</span>
+      <span class="team-member-username">@${escapeHTML(u.username)}</span>
+    </label>`;
+  }).join("");
+  // Reset search on rebuild so previously hidden rows reappear.
+  const search = document.getElementById("memberSearch");
+  if (search) search.value = "";
+  const clr = document.getElementById("memberSearchClear");
+  if (clr) clr.hidden = true;
+  refreshMemberCount();
+}
+
+function filterMembers() {
+  const q = (document.getElementById("memberSearch").value || "").trim().toLowerCase();
+  const clr = document.getElementById("memberSearchClear");
+  if (clr) clr.hidden = !q;
+  document.querySelectorAll("#membersList .team-member-row").forEach(row => {
+    row.classList.toggle("is-hidden", q && !row.dataset.search.includes(q));
+  });
+}
+
+function clearMemberSearch() {
+  const sb = document.getElementById("memberSearch");
+  if (sb) { sb.value = ""; sb.focus(); }
+  filterMembers();
+}
+
+// Toggle every *visible* checkbox (i.e. those not display:none'd by the search filter).
+// Lets admin search "ahmed" then bulk-add the whole filtered set.
+function selectAllVisibleMembers(checked) {
+  document.querySelectorAll("#membersList .team-member-row:not(.is-hidden) input[type='checkbox']")
+    .forEach(cb => { cb.checked = checked; });
+  refreshMemberCount();
+}
+
+function refreshMemberCount() {
+  const total = document.querySelectorAll("#membersList input[type='checkbox']").length;
+  const checked = document.querySelectorAll("#membersList input[type='checkbox']:checked").length;
+  const el = document.getElementById("memberSelectedCount");
+  if (!el) return;
+  el.textContent = total
+    ? t("teams.selected_count").replace("{n}", checked).replace("{total}", total)
+    : "";
+}
+
+function getCheckedMembers() {
+  return [...document.querySelectorAll("#membersList input[type=checkbox]:checked")]
+    .map(cb => parseInt(cb.value));
+}
+
+async function openNew() {
+  editingId = null;
+  document.getElementById("modalTitle").textContent = t("teams.add");
+  document.getElementById("mName").value = "";
+  document.getElementById("mDesc").value = "";
+  document.getElementById("mError").classList.remove("show");
+  buildLeaderOptions(null);
+  buildMembersCheckboxes([]);
+  openModal("teamModal");
+}
+
+async function openEdit(teamId) {
+  editingId = teamId;
+  try {
+    const team = await api(`/api/teams/${teamId}`);
+    document.getElementById("modalTitle").textContent = t("common.edit") + ": " + team.name;
+    document.getElementById("mName").value = team.name;
+    document.getElementById("mDesc").value = team.description || "";
+    document.getElementById("mError").classList.remove("show");
+    buildLeaderOptions(team.leader_id);
+    buildMembersCheckboxes((team.members || []).map(m => m.id));
+    openModal("teamModal");
+  } catch (e) { toastError(e); }
+}
+
+async function saveTeam() {
+  const err = document.getElementById("mError");
+  err.classList.remove("show");
+  const name = document.getElementById("mName").value.trim();
+  if (!name) {
+    err.textContent = t("teams.name_required");
+    err.classList.add("show");
+    return;
+  }
+
+  const body = {
+    name,
+    description: document.getElementById("mDesc").value.trim(),
+    leader_id: parseInt(document.getElementById("mLeader").value) || null,
+  };
+  const memberIds = getCheckedMembers();
+
+  try {
+    let teamId = editingId;
+    if (editingId) {
+      await api(`/api/teams/${editingId}`, { method: "PUT", body });
+    } else {
+      const res = await api("/api/teams", { method: "POST", body });
+      teamId = res.id;
+    }
+    await api(`/api/teams/${teamId}/members`, { method: "PUT", body: { member_ids: memberIds } });
+    toast(t("common.saved"), "success");
+    closeModal("teamModal");
+    loadAll();
+  } catch (e) {
+    err.textContent = tError(e);
+    err.classList.add("show");
+  }
+}
+
+let _pendingDeleteTeamId = null;
+function deleteTeam(teamId) {
+  const team = teams.find(t => t.id === teamId);
+  if (!team) return;
+  _pendingDeleteTeamId = teamId;
+  document.getElementById("teamDeleteName").textContent = team.name;
+  openModal("teamDeleteModal");
+}
+
+async function confirmTeamDelete() {
+  if (!_pendingDeleteTeamId) { closeModal("teamDeleteModal"); return; }
+  const id = _pendingDeleteTeamId;
+  try {
+    await api(`/api/teams/${id}`, { method: "DELETE" });
+    closeModal("teamDeleteModal");
+    toast(t("common.deleted"), "success");
+    _pendingDeleteTeamId = null;
+    loadAll();
+  } catch (e) {
+    closeModal("teamDeleteModal");
+    toastError(e);
+  }
+}
+
+function onLangChange() { render(); }
+
+loadAll();
+</script>
+{% endblock %}

@@ -1,0 +1,478 @@
+{% extends "base.html" %}
+{% block title %}Ain KPI{% endblock %}
+
+{% block head %}
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title" data-i18n="tl.title"></h1>
+    <p class="page-subtitle" data-i18n="tl.subtitle"></p>
+  </div>
+  <div class="flex items-center gap-2">
+    <div class="field" style="margin-bottom:0">
+      <label data-i18n="common.month"></label>
+      <div id="dateRangeHost"></div>
+    </div>
+    <div id="teamBadge" class="text-muted" style="font-size:12px;font-weight:600"></div>
+  </div>
+</div>
+
+<!-- Consolidated contextual range banner. ONE banner; copy switches based
+     on what the user picked:
+       - sub-month preset       → tl.range_warning_submonth
+       - multi-month range      → tl.range_warning_multimonth ({month} = latest)
+       - single calendar month  → hidden
+     min-height host reserves the slot to prevent layout shift. -->
+<div class="dr-context-warning-host" id="rangeWarningHost" aria-live="polite">
+  <div class="dr-context-warning" id="rangeWarning" hidden>
+    <span class="material-symbols-outlined" aria-hidden="true">warning</span>
+    <div class="dr-context-warning-text" id="rangeWarningText"></div>
+  </div>
+</div>
+
+<div id="noTeam" class="hidden">
+  <div class="empty-state">
+    <div class="empty-state-icon"><span class="material-symbols-outlined" aria-hidden="true">group_off</span></div>
+    <div data-i18n="tl.no_team"></div>
+  </div>
+</div>
+
+<div id="kpiContent" class="hidden">
+  <!-- Headline: score stat + gauge -->
+  <div class="tl-headline">
+    <div class="tl-headline-score">
+      <div class="tl-headline-label" data-i18n="tl.score"></div>
+      <div class="tl-headline-value" id="tlHeadlineNum">—</div>
+      <div class="tl-headline-rating" id="tlHeadlineRating"></div>
+      <div class="tl-headline-meta" id="tlHeadlineMeta"></div>
+    </div>
+    <div class="tl-headline-gauge">
+      <div id="chartScoreGauge" class="plotly-container short"><div class="chart-skel"></div></div>
+    </div>
+  </div>
+
+  <!-- My team aggregate card -->
+  <div class="tl-team-card" id="tlTeamCard" hidden>
+    <div class="card-title" data-i18n="tl.my_team"></div>
+    <div class="tl-team-grid" id="tlTeamGrid"></div>
+  </div>
+
+  <!-- My team members list — TL-05/TL-06: every sales rep on this team
+       with name, status, and per-rep performance summary. -->
+  <div class="card tl-members-card" id="tlMembersCard" hidden>
+    <div class="card-title">
+      <span data-i18n="tl.team_members"></span>
+      <span class="text-muted" style="font-size:11px;margin-inline-start:8px" data-i18n="tl.team_members_hint"></span>
+    </div>
+    <div id="tlMembersList" class="tl-members-list"></div>
+  </div>
+
+  <!-- Pending-eval callout (renders only when manual fields haven't been scored yet) -->
+  <div class="tl-pending-callout" id="tlPendingCallout" hidden>
+    <span class="material-symbols-outlined" aria-hidden="true">schedule</span>
+    <div>
+      <div class="tl-pending-callout-title" data-i18n="tl.pending_callout_title"></div>
+      <div class="tl-pending-callout-body" data-i18n="tl.pending_callout_body"></div>
+    </div>
+  </div>
+
+  <!-- Per-pillar breakdown bars (radar removed — duplicated this data) -->
+  <div class="chart-card">
+    <h3>
+      <span data-i18n="dash.chart_breakdown"></span>
+      <span class="chart-card-hint" data-i18n="tl.bars_click_hint"></span>
+    </h3>
+    <div id="chartScoreBars" class="plotly-container short"><div class="chart-skel"></div></div>
+  </div>
+
+  <!-- Per-KPI drill-down modal (opened by clicking a bar above) -->
+  <div class="modal-backdrop" id="kpiDrillModal" role="dialog" aria-modal="true" aria-labelledby="kpiDrillTitle">
+    <div class="modal" style="max-width:520px">
+      <div class="modal-header">
+        <div class="modal-title" id="kpiDrillTitle"></div>
+        <button class="modal-close" onclick="closeModal('kpiDrillModal')" data-i18n-aria-label="common.close">✕</button>
+      </div>
+      <div class="modal-body" id="kpiDrillBody"></div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('kpiDrillModal')" data-i18n="common.close"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-title" data-i18n="tl.auto_section"></div>
+    <div id="autoRows"></div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-title" data-i18n="tl.manual_section"></div>
+    <div id="manualRows"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}?v=flat51"></script>
+<script src="{{ url_for('static', filename='js/date_range.js') }}?v=flat51"></script>
+<script>
+const TL_ID = {{ user.id }};
+let cfg = null;
+let kpiData = null;
+let _drCtrl = null;
+
+async function init() {
+  cfg = await api("/api/kpi/config");
+  // Picker mounts and fires onChange once → first loadKPI runs there.
+}
+
+// Resolve the single month this page renders for, given the current picker
+// range. tl-kpi/:id/:month is single-month-by-formula; for multi-month ranges
+// we pick the latest month and surface a banner explaining the choice.
+function _selectedMonth() {
+  const r = _drCtrl ? _drCtrl.getRange() : null;
+  if (!r) return currentMonth();
+  return r.monthStr || r.to.slice(0, 7);
+}
+
+function _updateRangeWarning() {
+  const banner = document.getElementById("rangeWarning");
+  const txt = document.getElementById("rangeWarningText");
+  if (!banner || !txt) return;
+  const r = _drCtrl ? _drCtrl.getRange() : null;
+  if (!r || r.monthStr) {
+    // Single calendar month — no banner needed.
+    banner.hidden = true;
+    return;
+  }
+  if (r.isSubMonth) {
+    // Sub-month range: surface that scoring is monthly and detail isn't useful.
+    txt.innerHTML = t("tl.range_warning_submonth");
+  } else {
+    // Multi-month aligned: latest month auto-selected; tell the user which.
+    const monthLabel = fmtMonth(_selectedMonth());
+    txt.innerHTML = t("tl.range_warning_multimonth").replace("{month}", monthLabel);
+  }
+  banner.hidden = false;
+}
+
+async function loadKPI() {
+  const month = _selectedMonth();
+  if (!month) return;
+
+  _updateRangeWarning();
+  document.getElementById("kpiContent").classList.add("hidden");
+  document.getElementById("noTeam").classList.add("hidden");
+
+  try {
+    kpiData = await api(`/api/kpi/tl-kpi/${TL_ID}/${month}`);
+    render(kpiData);
+  } catch (e) {
+    if (e.error_code === "no_team_assigned") {
+      document.getElementById("noTeam").classList.remove("hidden");
+    } else {
+      toastError(e);
+    }
+  }
+}
+
+function render(data) {
+  const lbl = key => t("kpi." + key);
+
+  // Team badge
+  document.getElementById("teamBadge").textContent =
+    `${data.team_submitted} ${t("common.of")} ${data.team_size} ${t("tl.team_submitted_of")}`;
+
+  // Headline score
+  const score = data.total_score || 0;
+  const rating = data.rating || localRating(score);
+  const ratingCls = ratingClass(rating).replace("badge-", "");
+  document.getElementById("tlHeadlineNum").textContent = score.toFixed(1) + "%";
+  document.getElementById("tlHeadlineNum").className = "tl-headline-value is-" + ratingCls;
+  document.getElementById("tlHeadlineRating").textContent = t("rating." + rating);
+
+  // Rank meta — "Rank 3 of 12 team leaders · TL average: 64%"
+  const meta = document.getElementById("tlHeadlineMeta");
+  if (data.tl_rank && data.tl_total) {
+    meta.innerHTML = t("tl.rank_line")
+      .replace("{rank}", `<strong>${data.tl_rank}</strong>`)
+      .replace("{total}", data.tl_total)
+      .replace("{avg}", `<strong>${(data.tl_avg || 0).toFixed(1)}%</strong>`);
+  } else {
+    meta.textContent = "";
+  }
+
+  // My team card — only shown if the TL has team data this month.
+  renderTeamCard(data);
+  renderTeamMembers(data);
+
+  // Pending-eval card-level callout
+  const isPending = !data.tl_entry || !data.tl_entry.dataentry_submitted_at;
+  document.getElementById("tlPendingCallout").hidden = !isPending;
+
+  // Score charts (radar dropped — bars carry the same per-pillar data)
+  if (typeof Plotly !== 'undefined') {
+    Charts.drawGauge("chartScoreGauge", score, { target: 75 });
+
+    const breakdownKeys = Object.keys(data.breakdown || {});
+    const labels = breakdownKeys.map(lbl);
+    const values = Object.values(data.breakdown || {}).map(v => v.achievement_pct);
+    if (labels.length) {
+      Charts.drawBarChart("chartScoreBars", {
+        x: labels,
+        y: values,
+        colors: values.map(v => Charts.scoreColorHex(v)),
+        labels: values.map(v => v.toFixed(0) + "%"),
+      }, { xangle: -25 });
+
+      // Make each bar clickable → open the per-KPI drill-down modal.
+      const barEl = document.getElementById("chartScoreBars");
+      if (barEl && barEl.removeAllListeners) {
+        try { barEl.removeAllListeners('plotly_click'); } catch {}
+      }
+      barEl.style.cursor = 'pointer';
+      barEl.on && barEl.on('plotly_click', (ev) => {
+        const idx = ev && ev.points && ev.points[0] && ev.points[0].pointIndex;
+        if (typeof idx !== 'number') return;
+        const key = breakdownKeys[idx];
+        if (key) openKpiDrill(key, data);
+      });
+    }
+  }
+
+  // Auto fields
+  const autoKeys = (cfg && cfg.tl_auto_fields) || [];
+  document.getElementById("autoRows").innerHTML = autoKeys.map(key => {
+    const b = data.breakdown[key];
+    if (!b) return "";
+    const pct = b.achievement_pct;
+    return `
+      <div class="kpi-row">
+        <div class="kpi-label">${lbl(key)}</div>
+        <div class="kpi-bar-wrap">
+          <div class="kpi-bar" style="width:${Math.min(pct,100)}%;background:${Charts.scoreColorHex(pct)}"></div>
+        </div>
+        <div class="kpi-nums">
+          <span class="actual">${fmtNum(b.actual)}</span>
+          <span class="sep">/</span>
+          <span class="target">${fmtNum(b.target)}</span>
+          <span class="pct">${pct}%</span>
+          <span class="weight">${b.weight}pt → ${b.weighted_score.toFixed(1)}</span>
+        </div>
+      </div>`;
+  }).join("");
+
+  // Manual fields — pending state now surfaced via .tl-pending-callout above the section.
+  // We still render an empty placeholder if no data so the section title doesn't dangle.
+  const manualKeys = (cfg && cfg.tl_manual_fields) || [];
+  const isManualPending = !data.tl_entry || !data.tl_entry.dataentry_submitted_at;
+  document.getElementById("manualRows").innerHTML = isManualPending
+    ? `<div class="text-muted" style="padding:8px 4px;font-size:13px">${t("tl.pending_eval")}</div>`
+    : manualKeys.map(key => {
+        const b = data.breakdown[key];
+        if (!b) return "";
+        const pct = b.achievement_pct;
+        return `
+          <div class="kpi-row">
+            <div class="kpi-label">${lbl(key)}</div>
+            <div class="kpi-bar-wrap">
+              <div class="kpi-bar" style="width:${Math.min(pct,100)}%;background:${Charts.scoreColorHex(pct)}"></div>
+            </div>
+            <div class="kpi-nums">
+              <span class="actual">${fmtNum(b.actual)}</span>
+              <span class="sep">/</span>
+              <span class="target">${fmtNum(b.target)}</span>
+              <span class="pct">${pct}%</span>
+              <span class="weight">${b.weight}pt → ${b.weighted_score.toFixed(1)}</span>
+            </div>
+          </div>`;
+      }).join("");
+
+  document.getElementById("kpiContent").classList.remove("hidden");
+}
+
+function renderTeamCard(data) {
+  const card = document.getElementById("tlTeamCard");
+  const grid = document.getElementById("tlTeamGrid");
+  if (!card || !grid) return;
+  const hasTeamData =
+    data.team_size > 0 || data.team_top || data.team_avg_score != null;
+  if (!hasTeamData) { card.hidden = true; return; }
+  card.hidden = false;
+
+  const submittedRatio = data.team_size
+    ? Math.round((data.team_submitted / data.team_size) * 100)
+    : 0;
+  // tone = visual accent strip + icon tint. Picked semantically:
+  //   brand → headline averages, accent → "above" / positive counts,
+  //   info → submission progress, warm → top performer (gold-ish),
+  //   danger → weakest performer.
+  const stats = [
+    {
+      lbl: t("tl.team_avg_label"),
+      val: (data.team_avg_score || 0).toFixed(1) + "%",
+      sub: data.team_size + " " + t("tl_eval.members"),
+      icon: "trending_up",
+      tone: "brand",
+      isName: false,
+    },
+    {
+      lbl: t("tl.team_above_55"),
+      val: data.team_above_55 || 0,
+      sub: (data.team_below_55 || 0) + " " + t("tl.below_55"),
+      icon: "verified",
+      tone: "accent",
+      isName: false,
+    },
+    {
+      lbl: t("tl.submitted_count"),
+      val: (data.team_submitted || 0) + "/" + (data.team_size || 0),
+      sub: submittedRatio + "%",
+      icon: "assignment_turned_in",
+      tone: "info",
+      isName: false,
+    },
+    {
+      lbl: t("tl.top_performer"),
+      val: data.team_top ? escapeHTMLForTL(data.team_top.name) : "—",
+      sub: data.team_top ? data.team_top.score + "%" : "",
+      icon: "emoji_events",
+      tone: "warm",
+      isName: true,
+    },
+    {
+      lbl: t("tl.weakest_performer"),
+      val: data.team_weakest ? escapeHTMLForTL(data.team_weakest.name) : "—",
+      sub: data.team_weakest ? data.team_weakest.score + "%" : "",
+      icon: "trending_down",
+      tone: "danger",
+      isName: true,
+    },
+  ];
+  grid.innerHTML = stats.map(s => `
+    <div class="tl-team-stat tone-${s.tone}">
+      <div class="tl-team-stat-icon" aria-hidden="true">
+        <span class="material-symbols-outlined">${s.icon}</span>
+      </div>
+      <div class="tl-team-stat-body">
+        <div class="lbl">${s.lbl}</div>
+        <div class="val${s.isName ? ' is-name' : ''}" title="${typeof s.val === 'string' ? s.val.replace(/"/g,'&quot;') : s.val}">${s.val}</div>
+        ${s.sub ? `<div class="sub">${s.sub}</div>` : ""}
+      </div>
+    </div>`).join("");
+}
+
+function memberStatusBadge(status) {
+  // evaluated → final score locked; submitted → awaiting eval; pending → not started.
+  const map = {
+    evaluated: { cls: "badge-excellent", key: "tl.member_status_evaluated" },
+    submitted: { cls: "badge-pending",   key: "tl.member_status_submitted" },
+    pending:   { cls: "badge-pending",   key: "tl.member_status_pending"   },
+  };
+  const m = map[status] || map.pending;
+  return `<span class="badge ${m.cls}">${t(m.key)}</span>`;
+}
+
+function renderTeamMembers(data) {
+  const card = document.getElementById("tlMembersCard");
+  const host = document.getElementById("tlMembersList");
+  if (!card || !host) return;
+  const members = Array.isArray(data.members) ? data.members : [];
+  if (!members.length) {
+    card.hidden = false;
+    host.innerHTML = `<div class="empty-state" style="padding:28px 12px">
+      <div class="empty-state-icon"><span class="material-symbols-outlined" aria-hidden="true">person_off</span></div>
+      <div>${t("tl.team_members_empty")}</div>
+    </div>`;
+    return;
+  }
+  card.hidden = false;
+  host.innerHTML = members.map(m => {
+    const score = (m.total_score == null) ? null : Number(m.total_score);
+    const rating = m.rating || (score != null ? localRating(score) : null);
+    const ratingBadge = rating
+      ? `<span class="badge ${ratingClass(rating)}">${t("rating." + rating)}</span>`
+      : "";
+    const scoreCell = score != null
+      ? `<span class="tl-member-score">${score.toFixed(1)}%</span>`
+      : `<span class="tl-member-score is-empty">${t("tl.member_no_score")}</span>`;
+    const initial = escapeHTMLForTL((m.full_name || "?").trim().charAt(0));
+    const avatarMarkup = m.avatar_url
+      ? `<div class="avatar avatar-sm avatar-img"><img src="${escapeHTMLForTL(m.avatar_url)}" alt=""></div>`
+      : `<div class="avatar avatar-sm">${initial}</div>`;
+    return `
+      <div class="tl-member-row" data-status="${escapeHTMLForTL(m.status)}">
+        ${avatarMarkup}
+        <div class="tl-member-name">
+          <div class="tl-member-name-line">${escapeHTMLForTL(m.full_name || "—")}</div>
+          <div class="tl-member-name-sub text-muted">@${escapeHTMLForTL(m.username || "")}</div>
+        </div>
+        ${memberStatusBadge(m.status)}
+        ${ratingBadge}
+        ${scoreCell}
+      </div>`;
+  }).join("");
+}
+
+function escapeHTMLForTL(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
+    {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]
+  ));
+}
+
+function openKpiDrill(key, data) {
+  const b = data.breakdown && data.breakdown[key];
+  if (!b) return;
+  const lbl = (k) => t("kpi." + k);
+  const pct = Number(b.achievement_pct || 0);
+  const cls = ratingClass(localRating(pct)).replace("badge-", "");
+  document.getElementById("kpiDrillTitle").textContent = lbl(key);
+
+  const rows = [
+    [t("dash.actual"), fmtNum(b.actual)],
+    [t("dash.target"), fmtNum(b.target)],
+    [t("dash.achievement_pct"), `<span class="kpi-drill-pct is-${cls}">${pct.toFixed(1)}%</span>`],
+    [t("kpi.weight"), `${b.weight}pt → ${(b.weighted_score || 0).toFixed(1)}`],
+  ];
+
+  document.getElementById("kpiDrillBody").innerHTML = `
+    <dl class="kpi-drill-grid">
+      ${rows.map(([k, v]) => `
+        <div class="kpi-drill-item">
+          <dt>${k}</dt>
+          <dd>${v}</dd>
+        </div>`).join("")}
+    </dl>
+    <div class="bar" style="margin-top:14px"><div class="bar-fill ${scoreColor(pct)}" style="width:${Math.min(pct,100)}%"></div></div>
+    <p class="kpi-drill-hint" data-i18n-html="tl.drill_hint">${t("tl.drill_hint")}</p>
+  `;
+  openModal("kpiDrillModal");
+}
+
+function onLangChange() {
+  if (_drCtrl) _drCtrl.refreshLabels();
+  loadKPI();   // re-renders banner + cards in the new locale
+}
+
+// Theme flip — re-run render against the cached payload so charts pick up
+// the new palette without an unnecessary API round-trip.
+function onThemeChange() {
+  if (kpiData) render(kpiData);
+}
+
+// TL's own KPI is single-month-by-formula. Picker now allows all presets;
+// the consolidated warning banner explains when the picker's range can't
+// drive the detail view directly:
+//   sub-month  → tl.range_warning_submonth
+//   multi-month → tl.range_warning_multimonth (latest month auto-selected)
+init().then(() => {
+  _drCtrl = DateRange.mount(document.getElementById("dateRangeHost"), {
+    defaultPreset: "last_30",
+    mode: "full",
+    onChange: () => loadKPI(),
+  });
+});
+</script>
+{% endblock %}

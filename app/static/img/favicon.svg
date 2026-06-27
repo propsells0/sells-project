@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Brand background circle -->
+  <circle cx="32" cy="32" r="32" fill="#474dc5"/>
+  <!-- Outer ring -->
+  <circle cx="32" cy="32" r="27" stroke="rgba(255,255,255,0.35)" stroke-width="2" fill="none"/>
+  <!-- Open arc -->
+  <path d="M44.5 16.5A18 18 0 1 0 44.5 47.5"
+        stroke="white" stroke-width="3.4" stroke-linecap="round" fill="none"/>
+  <!-- Chevron / arrow -->
+  <path d="M21 22.5L31.5 32L21 41.5"
+        stroke="white" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Anchor dot -->
+  <circle cx="46" cy="32" r="2.4" fill="white"/>
+</svg>

@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Ain Real Estate - Team Performance Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(24px);
+            border-top: 1px solid rgba(255, 255, 255, 0.4);
+            border-left: 1px solid rgba(255, 255, 255, 0.4);
+        }
+        .recessed-input {
+            background: rgba(255, 255, 255, 0.5);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-container-low": "#f1f3ff",
+                      "on-tertiary-container": "#f3fffd",
+                      "on-surface-variant": "#464653",
+                      "secondary": "#884f41",
+                      "primary-container": "#6067df",
+                      "surface-container": "#ebedfa",
+                      "surface-container-high": "#e5e7f4",
+                      "on-error": "#ffffff",
+                      "on-error-container": "#93000a",
+                      "primary-fixed-dim": "#bfc2ff",
+                      "on-tertiary": "#ffffff",
+                      "tertiary-fixed": "#65f8ed",
+                      "surface-bright": "#faf9ff",
+                      "surface-tint": "#4950c7",
+                      "surface-container-lowest": "#ffffff",
+                      "on-primary-container": "#fffbff",
+                      "on-secondary": "#ffffff",
+                      "primary-fixed": "#e0e0ff",
+                      "outline-variant": "#c6c5d6",
+                      "on-primary": "#ffffff",
+                      "on-primary-fixed": "#02006d",
+                      "error": "#ba1a1a",
+                      "inverse-surface": "#2d303a",
+                      "surface-dim": "#d7d9e6",
+                      "error-container": "#ffdad6",
+                      "secondary-fixed-dim": "#ffb4a2",
+                      "on-secondary-container": "#7a4336",
+                      "primary": "#474dc5",
+                      "tertiary-container": "#00837c",
+                      "inverse-primary": "#bfc2ff",
+                      "secondary-fixed": "#ffdad2",
+                      "secondary-container": "#ffb4a2",
+                      "surface-variant": "#e0e2ef",
+                      "tertiary-fixed-dim": "#40dcd1",
+                      "on-tertiary-fixed-variant": "#00504b",
+                      "on-surface": "#181b24",
+                      "on-primary-fixed-variant": "#3035af",
+                      "background": "#faf9ff",
+                      "outline": "#767685",
+                      "on-secondary-fixed": "#360e05",
+                      "on-secondary-fixed-variant": "#6c382b",
+                      "surface": "#faf9ff",
+                      "tertiary": "#006762",
+                      "on-tertiary-fixed": "#00201e",
+                      "inverse-on-surface": "#eef0fd",
+                      "surface-container-highest": "#e0e2ef",
+                      "on-background": "#181b24"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "card-padding": "20px",
+                      "unit": "4px",
+                      "gutter": "24px",
+                      "container-margin": "32px",
+                      "element-gap": "12px"
+              },
+              "fontFamily": {
+                      "body-lg": ["Inter"],
+                      "label-caps": ["Inter"],
+                      "body-sm": ["Inter"],
+                      "headline-xl": ["Inter"],
+                      "headline-md": ["Inter"],
+                      "data-num": ["Inter"]
+              },
+              "fontSize": {
+                      "body-lg": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "label-caps": ["12px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                      "body-sm": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                      "headline-xl": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "headline-md": ["20px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                      "data-num": ["24px", {"lineHeight": "1", "letterSpacing": "-0.01em", "fontWeight": "600"}]
+              }
+            },
+          },
+        }
+    </script>
+</head>
+<body class="bg-background min-h-screen font-body-lg text-on-surface selection:bg-primary-fixed-dim">
+<!-- Top Navigation Bar -->
+<nav class="bg-white/70 backdrop-blur-xl font-sans tracking-tight text-sm font-medium docked full-width top-0 sticky z-50 border-b border-white/40 shadow-[0_10px_30px_rgba(124,131,253,0.1)] flex justify-between items-center px-8 h-16 w-full max-w-[1920px] mx-auto">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold tracking-tighter text-indigo-600 dark:text-indigo-300">Ain Real Estate</span>
+<div class="hidden md:flex gap-6 items-center">
+<a class="text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500 pb-1" href="#">Dashboard</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-indigo-400 transition-colors" href="#">Evaluation</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-indigo-400 transition-colors" href="#">Finance</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-indigo-400 transition-colors" href="#">Users</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-indigo-400 transition-colors" href="#">PropFinder</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="recessed-input px-3 py-1.5 rounded-full flex items-center gap-2 text-outline">
+<span class="material-symbols-outlined text-[20px]">search</span>
+<span class="text-body-sm">Search assets...</span>
+</div>
+<button class="p-2 hover:bg-white/20 transition-all duration-300 rounded-full text-slate-500">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 hover:bg-white/20 transition-all duration-300 rounded-full text-slate-500">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<img alt="User profile avatar" class="w-8 h-8 rounded-full border-2 border-white shadow-sm" data-alt="close-up portrait of a professional manager in a bright modern office with soft natural lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBWh-5aQTQfX3DxnU0LBHWeXShttQf7Ag99Bt-kHxjp0t4ow1KG1Q6WF9HUhPuM6JtRHh3-65F3WsFZRcrAwJS4Ibu_HNNMmiTwC_wCft80yledGA9vyq5qIwNOS-fiHIReuCLLTaXblWOX16CIlPu6SMPE8JCAlZHWYLQAhtdG4LgWeapKDPa2zpQZOsqUT9F6IYwBovnsiVLYccnvTAAdqVFQMYR-RPfGpEAufcvm1SF4cSsYk0d6n8vpXDADArvlo9KnL_LD-Lr7"/>
+</div>
+</nav>
+<div class="flex">
+<!-- Side Navigation Bar -->
+<aside class="h-screen w-64 fixed left-0 top-0 border-r bg-white/60 backdrop-blur-2xl font-sans text-sm font-semibold border-r border-white/30 shadow-xl shadow-indigo-500/5 flex flex-col p-4 gap-2 pt-20">
+<div class="px-4 py-2 mb-4">
+<p class="text-lg font-black text-indigo-700">Ain Management</p>
+<p class="text-xs text-slate-400">Premium Assets</p>
+</div>
+<a class="flex items-center gap-3 px-4 py-3 bg-indigo-50/50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 rounded-xl hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span>Overview</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-500 hover:bg-white/40 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">domain</span>
+<span>Portfolio</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-500 hover:bg-white/40 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span>Transactions</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-500 hover:bg-white/40 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">query_stats</span>
+<span>Market Analysis</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-500 hover:bg-white/40 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">description</span>
+<span>Reports</span>
+</a>
+<div class="mt-auto border-t border-white/30 pt-4">
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-500 hover:bg-white/40 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">help</span>
+<span>Support</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-error hover:bg-white/40 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span>Logout</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 ml-64 p-container-margin space-y-gutter">
+<!-- Header Section -->
+<header class="flex justify-between items-end">
+<div>
+<h1 class="font-headline-xl text-headline-xl text-on-surface">Team Performance Dashboard</h1>
+<p class="text-body-lg text-outline">Real-time analytical overview of sales and agent efficiency</p>
+</div>
+<button class="bg-gradient-to-r from-primary to-primary-container text-on-primary px-6 py-2.5 rounded-full font-bold shadow-lg shadow-primary/20 hover:scale-105 transition-transform flex items-center gap-2">
+<span class="material-symbols-outlined">download</span>
+                    Export PDF
+                </button>
+</header>
+<!-- Top Row: 6 Stat Cards -->
+<section class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-gutter">
+<!-- Sales Count -->
+<div class="glass-card p-card-padding rounded-xl shadow-[0_10px_30px_rgba(124,131,253,0.1)] hover:scale-[1.02] transition-all">
+<div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-primary">sell</span>
+</div>
+<p class="text-label-caps font-label-caps text-outline mb-1 uppercase">Sales Count</p>
+<p class="text-data-num font-data-num text-on-surface">428</p>
+<p class="text-xs text-tertiary mt-2 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">trending_up</span> +12%
+                    </p>
+</div>
+<!-- Avg KPI -->
+<div class="glass-card p-card-padding rounded-xl shadow-[0_10px_30px_rgba(124,131,253,0.1)] hover:scale-[1.02] transition-all">
+<div class="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-secondary">analytics</span>
+</div>
+<p class="text-label-caps font-label-caps text-outline mb-1 uppercase">Avg KPI</p>
+<p class="text-data-num font-data-num text-on-surface">87.4%</p>
+<p class="text-xs text-tertiary mt-2 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">trending_up</span> +2.1%
+                    </p>
+</div>
+<!-- Top Performer -->
+<div class="glass-card p-card-padding rounded-xl shadow-[0_10px_30px_rgba(124,131,253,0.1)] hover:scale-[1.02] transition-all">
+<div class="w-10 h-10 rounded-full bg-tertiary-container/10 flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-tertiary-container">workspace_premium</span>
+</div>
+<p class="text-label-caps font-label-caps text-outline mb-1 uppercase">Top Lead</p>
+<p class="text-data-num font-data-num text-on-surface truncate">Sarah J.</p>
+<p class="text-xs text-outline mt-2 truncate">Property Expert</p>
+</div>
+<!-- Response Time -->
+<div class="glass-card p-card-padding rounded-xl shadow-[0_10px_30px_rgba(124,131,253,0.1)] hover:scale-[1.02] transition-all">
+<div class="w-10 h-10 rounded-full bg-primary-fixed-dim/20 flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-primary">timer</span>
+</div>
+<p class="text-label-caps font-label-caps text-outline mb-1 uppercase">Resp. Time</p>
+<p class="text-data-num font-data-num text-on-surface">14m</p>
+<p class="text-xs text-error mt-2 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">trending_down</span> -5%
+                    </p>
+</div>
+<!-- Total Revenue -->
+<div class="glass-card p-card-padding rounded-xl shadow-[0_10px_30px_rgba(124,131,253,0.1)] hover:scale-[1.02] transition-all">
+<div class="w-10 h-10 rounded-full bg-tertiary/10 flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-tertiary">payments</span>
+</div>
+<p class="text-label-caps font-label-caps text-outline mb-1 uppercase">Revenue</p>
+<p class="text-data-num font-data-num text-on-surface">$1.2M</p>
+<p class="text-xs text-tertiary mt-2 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">trending_up</span> +18%
+                    </p>
+</div>
+<!-- Active Listings -->
+<div class="glass-card p-card-padding rounded-xl shadow-[0_10px_30px_rgba(124,131,253,0.1)] hover:scale-[1.02] transition-all">
+<div class="w-10 h-10 rounded-full bg-secondary-container/20 flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-secondary">house</span>
+</div>
+<p class="text-label-caps font-label-caps text-outline mb-1 uppercase">Listings</p>
+<p class="text-data-num font-data-num text-on-surface">84</p>
+<p class="text-xs text-outline mt-2">Active now</p>
+</div>
+</section>
+<!-- Middle Row: Charts -->
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+<!-- Team Performance Horizontal Bar Chart -->
+<div class="glass-card lg:col-span-2 p-card-padding rounded-xl">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-md text-headline-md text-on-surface">Team Sales Volume</h3>
+<div class="flex gap-2">
+<span class="flex items-center gap-1 text-xs font-semibold text-outline">
+<span class="w-3 h-3 rounded-full bg-primary"></span> Luxury
+                            </span>
+<span class="flex items-center gap-1 text-xs font-semibold text-outline">
+<span class="w-3 h-3 rounded-full bg-tertiary"></span> Standard
+                            </span>
+</div>
+</div>
+<div class="space-y-6">
+<div class="space-y-2">
+<div class="flex justify-between text-body-sm font-medium">
+<span>North Region</span>
+<span>$420,000</span>
+</div>
+<div class="h-3 w-full bg-surface-container rounded-full overflow-hidden flex">
+<div class="h-full bg-primary rounded-l-full" style="width: 70%"></div>
+<div class="h-full bg-tertiary rounded-r-full" style="width: 20%"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-body-sm font-medium">
+<span>South Region</span>
+<span>$310,000</span>
+</div>
+<div class="h-3 w-full bg-surface-container rounded-full overflow-hidden flex">
+<div class="h-full bg-primary rounded-l-full" style="width: 55%"></div>
+<div class="h-full bg-tertiary rounded-r-full" style="width: 30%"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-body-sm font-medium">
+<span>East Region</span>
+<span>$280,000</span>
+</div>
+<div class="h-3 w-full bg-surface-container rounded-full overflow-hidden flex">
+<div class="h-full bg-primary rounded-l-full" style="width: 45%"></div>
+<div class="h-full bg-tertiary rounded-r-full" style="width: 40%"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-body-sm font-medium">
+<span>West Region</span>
+<span>$190,000</span>
+</div>
+<div class="h-3 w-full bg-surface-container rounded-full overflow-hidden flex">
+<div class="h-full bg-primary rounded-l-full" style="width: 30%"></div>
+<div class="h-full bg-tertiary rounded-r-full" style="width: 50%"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Rating Distribution Donut Chart -->
+<div class="glass-card p-card-padding rounded-xl flex flex-col">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-6">Rating Distribution</h3>
+<div class="flex-1 flex flex-col items-center justify-center relative">
+<!-- Simulated Donut Chart with SVG -->
+<svg class="w-48 h-48 transform -rotate-90" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="transparent" r="40" stroke="#ebedfa" stroke-width="12"></circle>
+<circle cx="50" cy="50" fill="transparent" r="40" stroke="#474dc5" stroke-dasharray="100 151" stroke-linecap="round" stroke-width="12"></circle>
+<circle cx="50" cy="50" fill="transparent" r="40" stroke="#006762" stroke-dasharray="60 191" stroke-dashoffset="-100" stroke-linecap="round" stroke-width="12"></circle>
+<circle cx="50" cy="50" fill="transparent" r="40" stroke="#884f41" stroke-dasharray="40 211" stroke-dashoffset="-160" stroke-linecap="round" stroke-width="12"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="text-data-num font-data-num">4.8</span>
+<span class="text-xs text-outline uppercase font-bold tracking-widest">Avg score</span>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-2 mt-4">
+<div class="flex items-center gap-2 text-xs font-semibold text-on-surface-variant p-2 rounded-lg bg-surface-container-low">
+<span class="w-2 h-2 rounded-full bg-primary"></span> Excellent
+                        </div>
+<div class="flex items-center gap-2 text-xs font-semibold text-on-surface-variant p-2 rounded-lg bg-surface-container-low">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span> Good
+                        </div>
+<div class="flex items-center gap-2 text-xs font-semibold text-on-surface-variant p-2 rounded-lg bg-surface-container-low">
+<span class="w-2 h-2 rounded-full bg-secondary"></span> Average
+                        </div>
+<div class="flex items-center gap-2 text-xs font-semibold text-on-surface-variant p-2 rounded-lg bg-surface-container-low">
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span> Other
+                        </div>
+</div>
+</div>
+</section>
+<!-- Bottom Row: Detailed Ranked Table -->
+<section class="glass-card rounded-xl overflow-hidden border-none shadow-xl">
+<div class="p-card-padding flex justify-between items-center bg-white/40 border-b border-white/20">
+<h3 class="font-headline-md text-headline-md text-on-surface">Top Sales Representatives</h3>
+<div class="flex gap-2">
+<select class="recessed-input border-none rounded-lg text-body-sm font-medium py-1.5 focus:ring-primary">
+<option>This Quarter</option>
+<option>Last Month</option>
+</select>
+<button class="p-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead class="bg-surface-container-low/50">
+<tr>
+<th class="px-6 py-4 text-label-caps font-label-caps text-outline uppercase">Rep Name</th>
+<th class="px-6 py-4 text-label-caps font-label-caps text-outline uppercase">Deals Closed</th>
+<th class="px-6 py-4 text-label-caps font-label-caps text-outline uppercase">Total Value</th>
+<th class="px-6 py-4 text-label-caps font-label-caps text-outline uppercase">KPI Progress</th>
+<th class="px-6 py-4 text-label-caps font-label-caps text-outline uppercase">Status</th>
+<th class="px-6 py-4"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-white/20">
+<!-- Rep 1 -->
+<tr class="hover:bg-white/30 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<img alt="Rep Sarah" class="w-8 h-8 rounded-full" data-alt="portrait of a young female real estate agent with a confident smile in a minimal professional setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBoqw2FNpDe9WjQzxgD0AV-6N8Ai5OKYaZ7bw7bzjYmr37rOSFqVUbUwcbbEK2kSq1x7X37GpKF1mfpPzK7bbT94f6Gk4qEMRxghBLvffm6kTIwI0mrqgUUjbeHhbSwU96gluRqNpK28QvMLifOT0D6f9h9mqlwDXGW4aQVh9-PufS5o0KkIww6y2SzHeHuAN6neuskS_ruQyiZo8P3TFp-wfLiuIG_MjxdntyD8qe3OevfzAc3lXrWYG7PVpzMoThpfhTzCAgo8mit"/>
+<div>
+<p class="font-bold text-on-surface">Sarah Johnson</p>
+<p class="text-xs text-outline">Lead Agent • North</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 font-medium text-on-surface">14</td>
+<td class="px-6 py-4 font-medium text-on-surface">$124,500</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="flex-1 h-2 bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 92%"></div>
+</div>
+<span class="text-xs font-bold text-primary">92%</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 rounded-full text-xs font-bold bg-tertiary/10 text-tertiary">Top Performer</span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">more_vert</button>
+</td>
+</tr>
+<!-- Rep 2 -->
+<tr class="hover:bg-white/30 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<img alt="Rep Michael" class="w-8 h-8 rounded-full" data-alt="headshot of a middle-aged male sales representative wearing a crisp navy suit in a light-filled office" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDvZtgCgRYOUPArGGfhNUB1pOndi32hvJD9_Z4rswpRrP-Ak5dDh_J-xzl-Ls5wbIyp6odHutwdz3Mwz1DqYJXgXLp7_Dcgm0w3JuBqyNURVmniiGu88fciL931S-3uw2gxDJeMIBI60_0lqtvGkKq509-M8kZfiqlQXzKrwrQ5Ucx1rOItMRduRToaaNi5RTa6BqmcYIRpPKLXLkZhWJ1yzvNnARQ2i0HPD-x3Ih31uQ04EdskJDmPubFnfDq699RxrhEs8QGD7jwO"/>
+<div>
+<p class="font-bold text-on-surface">Michael Chen</p>
+<p class="text-xs text-outline">Senior Broker • South</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 font-medium text-on-surface">11</td>
+<td class="px-6 py-4 font-medium text-on-surface">$98,200</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="flex-1 h-2 bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 85%"></div>
+</div>
+<span class="text-xs font-bold text-primary">85%</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary">High Growth</span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">more_vert</button>
+</td>
+</tr>
+<!-- Rep 3 -->
+<tr class="hover:bg-white/30 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<img alt="Rep Alex" class="w-8 h-8 rounded-full" data-alt="professional portrait of a young man working in real estate with modern architecture in the blurred background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDMHFuwC6a-4OGVom8JrPJIiP2QJF0jcgDX3pajhcc8uE4lv2ixK3XiOZTcghHNjG3-Zb4gfcO_oPnXUL0w8qI7RoL0odtAyoxfe57yFaoEAI-2ICsTfrnhrQ2HwYpqdtb285KQxPXlpcgL33jJg0FD7XsvyP1bzjeJx4qbFVkHPS4NLZyOgtUf5aMjAri8xC4aX8Gm0WN0Wrm6k6zMo2CkH4ZwGEP2tNpr8zr_QK5AlZHNRDF5i9vyhhYhLuFtS8L58l1tGhEnYS-k"/>
+<div>
+<p class="font-bold text-on-surface">Alex Martinez</p>
+<p class="text-xs text-outline">Sales Associate • West</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 font-medium text-on-surface">8</td>
+<td class="px-6 py-4 font-medium text-on-surface">$72,000</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="flex-1 h-2 bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-secondary rounded-full" style="width: 68%"></div>
+</div>
+<span class="text-xs font-bold text-secondary">68%</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 rounded-full text-xs font-bold bg-surface-container text-outline">Stable</span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">more_vert</button>
+</td>
+</tr>
+<!-- Rep 4 -->
+<tr class="hover:bg-white/30 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<img alt="Rep Elena" class="w-8 h-8 rounded-full" data-alt="professional woman in real estate with a soft pleasant expression and professional business attire" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSpb5AXFGw8e3dFZWTJoopqt5LItDYhO1dI2ihlbaNlJJIqkXxjUgMgiuv4TxkqwIrh4swizKXBDMHVZ3BmBGglQ70djF2_eyAZcvN96nNO9reMoUDf0IufKHCgdC5BBhbl-g6mVAfHpvBAOLiFJkB8QtyjKk2CixgGX5PDWjzdOAHGv7CXxSmBp3gHNLe-UzpFle7xCB8TQA2K_DtvDaI-Yiz-SYoHbkFd52AeLfQ370DlHI1sjUG2b9JN0nj5E1mgdFJf0YGtBVG"/>
+<div>
+<p class="font-bold text-on-surface">Elena Wright</p>
+<p class="text-xs text-outline">Expert Consultant • East</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 font-medium text-on-surface">7</td>
+<td class="px-6 py-4 font-medium text-on-surface">$115,000</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="flex-1 h-2 bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 76%"></div>
+</div>
+<span class="text-xs font-bold text-primary">76%</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 rounded-full text-xs font-bold bg-tertiary/10 text-tertiary">Premium Focus</span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">more_vert</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-card-padding bg-white/20 flex justify-between items-center border-t border-white/20">
+<span class="text-body-sm text-outline">Showing 4 of 24 representatives</span>
+<div class="flex gap-1">
+<button class="p-2 rounded-lg border border-white/40 hover:bg-white/40 disabled:opacity-30">
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</button>
+<button class="px-3 py-1 rounded-lg bg-primary text-on-primary text-sm font-bold">1</button>
+<button class="px-3 py-1 rounded-lg border border-white/40 hover:bg-white/40 text-sm font-bold">2</button>
+<button class="px-3 py-1 rounded-lg border border-white/40 hover:bg-white/40 text-sm font-bold">3</button>
+<button class="p-2 rounded-lg border border-white/40 hover:bg-white/40">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+</div>
+</section>
+</main>
+</div>
+</body></html>

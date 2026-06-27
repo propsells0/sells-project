@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+  <!-- Outer ring -->
+  <circle cx="32" cy="32" r="29" stroke="currentColor" stroke-width="2.5" fill="none"/>
+  <!-- Open arc — top-right to bottom-right, opens to the left (the "C" / "eye" form). -->
+  <path d="M44.5 16.5A18 18 0 1 0 44.5 47.5"
+        stroke="currentColor" stroke-width="3.4" stroke-linecap="round" fill="none"/>
+  <!-- Inner mark: chevron / arrow that nests inside the arc, suggesting growth. -->
+  <path d="M21 22.5L31.5 32L21 41.5"
+        stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Subtle dot on the right side of the arc — anchors the composition. -->
+  <circle cx="46" cy="32" r="2.4" fill="currentColor"/>
+</svg>

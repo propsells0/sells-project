@@ -1,0 +1,484 @@
+{% extends "base.html" %}
+{% block title %}CRM Settings · Ain{% endblock %}
+
+{% block content %}
+<section class="hero-ribbon">
+  <div>
+    <h1 class="page-title" data-i18n="crm.admin.title"></h1>
+    <p class="page-subtitle text-muted" data-i18n="crm.admin.subtitle"></p>
+  </div>
+  <div class="hero-actions">
+    <a href="/admin" class="btn btn-ghost">
+      <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+      <span data-i18n="common.back"></span>
+    </a>
+  </div>
+</section>
+
+<nav class="crm-tabs" role="tablist" aria-label="CRM settings tabs">
+  <button class="crm-tab is-active" role="tab" aria-selected="true" data-tab="stages">
+    <span data-i18n="crm.admin.tab.stages"></span>
+  </button>
+  <button class="crm-tab" role="tab" aria-selected="false" data-tab="reps">
+    <span data-i18n="crm.admin.tab.reps"></span>
+  </button>
+</nav>
+
+<!-- ── TAB 1: Stage mappings ─────────────────────────────────────────── -->
+<section class="crm-tab-panel" data-panel="stages" role="tabpanel">
+  <!-- Add form -->
+  <div class="glass-card" style="padding:18px 20px;margin-bottom:18px">
+    <h3 style="margin:0 0 10px;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted)"
+        data-i18n="crm.admin.add"></h3>
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+      <div class="field" style="flex:1;min-width:200px;margin:0">
+        <label data-i18n="crm.admin.col.raw_stage"></label>
+        <input type="text" id="newStageRaw" maxlength="100" placeholder=""
+               data-i18n-placeholder="crm.admin.placeholder.raw_stage">
+      </div>
+      <div class="field" style="min-width:160px;margin:0">
+        <label data-i18n="crm.admin.col.normalized"></label>
+        <select id="newStageNormalized">
+          <option value="NO_ANSWER"    data-i18n="crm.stages.NO_ANSWER"></option>
+          <option value="FOLLOWING"    data-i18n="crm.stages.FOLLOWING"></option>
+          <option value="MEETING"      data-i18n="crm.stages.MEETING"></option>
+          <option value="CANCELLATION" data-i18n="crm.stages.CANCELLATION"></option>
+          <option value="INTERESTED"   data-i18n="crm.stages.INTERESTED"></option>
+          <option value="REQUEST"      data-i18n="crm.stages.REQUEST"></option>
+        </select>
+      </div>
+      <div class="field" style="min-width:200px;margin:0">
+        <label data-i18n="crm.admin.col.scope"></label>
+        <select id="newStageScope">
+          <option value="all" data-i18n="crm.admin.scope.global"></option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="addStageMapping()">
+        <span data-i18n="crm.admin.add"></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Existing mappings -->
+  <div class="glass-card table-wrap" style="padding:0;overflow-x:auto">
+    <table id="stageTable">
+      <thead>
+        <tr>
+          <th data-i18n="crm.admin.col.raw_stage"></th>
+          <th data-i18n="crm.admin.col.normalized"></th>
+          <th data-i18n="crm.admin.col.scope"></th>
+          <th data-i18n="crm.admin.col.created_by"></th>
+          <th style="text-align:end" data-i18n="crm.admin.col.actions"></th>
+        </tr>
+      </thead>
+      <tbody id="stageRows">
+        <tr><td colspan="5" class="text-muted" style="padding:18px;text-align:center" data-i18n="common.loading"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Unmatched stage suggestions -->
+  <div class="glass-card" style="padding:18px 20px;margin-top:18px">
+    <h3 style="margin:0 0 12px;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--warning)"
+        data-i18n="crm.admin.suggestions.title"></h3>
+    <ul class="suggestions-list" id="stageSuggestions">
+      <li class="text-muted" data-i18n="crm.admin.suggestions.empty_stages"></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ── TAB 2: Sales-rep mappings ─────────────────────────────────────── -->
+<section class="crm-tab-panel" data-panel="reps" role="tabpanel" hidden>
+  <div class="glass-card" style="padding:18px 20px;margin-bottom:18px">
+    <h3 style="margin:0 0 10px;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted)"
+        data-i18n="crm.admin.add"></h3>
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+      <div class="field" style="flex:1;min-width:200px;margin:0">
+        <label data-i18n="crm.admin.col.raw_name"></label>
+        <input type="text" id="newRepRaw" maxlength="150" placeholder=""
+               data-i18n-placeholder="crm.admin.placeholder.raw_name">
+      </div>
+      <div class="field" style="min-width:200px;margin:0">
+        <label data-i18n="crm.admin.col.mapped_user"></label>
+        <select id="newRepUser">
+          <option value="" data-i18n="common.none"></option>
+        </select>
+      </div>
+      <div class="field" style="min-width:200px;margin:0">
+        <label data-i18n="crm.admin.col.scope"></label>
+        <select id="newRepScope">
+          <option value="all" data-i18n="crm.admin.scope.global"></option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="addRepMapping()">
+        <span data-i18n="crm.admin.add"></span>
+      </button>
+    </div>
+  </div>
+
+  <div class="glass-card table-wrap" style="padding:0;overflow-x:auto">
+    <table id="repTable">
+      <thead>
+        <tr>
+          <th data-i18n="crm.admin.col.raw_name"></th>
+          <th data-i18n="crm.admin.col.mapped_user"></th>
+          <th data-i18n="crm.admin.col.scope"></th>
+          <th data-i18n="crm.admin.col.created_by"></th>
+          <th style="text-align:end" data-i18n="crm.admin.col.actions"></th>
+        </tr>
+      </thead>
+      <tbody id="repRows">
+        <tr><td colspan="5" class="text-muted" style="padding:18px;text-align:center" data-i18n="common.loading"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="glass-card" style="padding:18px 20px;margin-top:18px">
+    <h3 style="margin:0 0 12px;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--warning)"
+        data-i18n="crm.admin.suggestions.title"></h3>
+    <ul class="suggestions-list" id="repSuggestions">
+      <li class="text-muted" data-i18n="crm.admin.suggestions.empty_reps"></li>
+    </ul>
+  </div>
+</section>
+
+<!-- Confirmation modal for DELETE -->
+<div class="modal-backdrop" id="deleteConfirmModal" role="dialog" aria-modal="true" aria-labelledby="deleteConfirmTitle">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="deleteConfirmTitle" data-i18n="common.confirm"></div>
+      <button class="modal-close" onclick="closeModal('deleteConfirmModal')" data-i18n-aria-label="common.close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p data-i18n="crm.admin.confirm.delete"></p>
+      <p class="text-muted" id="deleteConfirmTarget" style="margin-top:8px;font-weight:600"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('deleteConfirmModal')" data-i18n="common.cancel"></button>
+      <button class="btn btn-danger" id="deleteConfirmGo" data-i18n="common.delete"></button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let suggestionsData = null;
+let pendingDelete = null;
+
+// Tabs
+document.querySelectorAll(".crm-tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const target = btn.getAttribute("data-tab");
+    document.querySelectorAll(".crm-tab").forEach(b => {
+      const active = b === btn;
+      b.classList.toggle("is-active", active);
+      b.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    document.querySelectorAll(".crm-tab-panel").forEach(p => {
+      p.hidden = p.getAttribute("data-panel") !== target;
+    });
+  });
+});
+
+// ─── Load everything in parallel ──────────────────────────────────────
+async function loadAll() {
+  try {
+    const [sugg, stages, reps] = await Promise.all([
+      api("/api/crm/unmatched-suggestions"),
+      api("/api/crm/stage-mappings"),
+      api("/api/crm/sales-rep-mappings"),
+    ]);
+    suggestionsData = sugg;
+    populateScopeDropdowns(sugg.campaigns || []);
+    populateUserDropdown(sugg.sales_users || []);
+    renderStageRows(stages || []);
+    renderRepRows(reps || []);
+    renderStageSuggestions(sugg.unmatched_stages || []);
+    renderRepSuggestions(sugg.unmatched_reps || []);
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+function populateScopeDropdowns(campaigns) {
+  ["newStageScope", "newRepScope"].forEach(id => {
+    const sel = document.getElementById(id);
+    while (sel.options.length > 1) sel.remove(1);  // keep "Global"
+    campaigns.forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = String(c.id);
+      opt.textContent = c.campaign_name;
+      sel.appendChild(opt);
+    });
+  });
+}
+
+function populateUserDropdown(users) {
+  const sel = document.getElementById("newRepUser");
+  while (sel.options.length > 1) sel.remove(1);  // keep "—"
+  users.forEach(u => {
+    const opt = document.createElement("option");
+    opt.value = String(u.id);
+    opt.textContent = u.full_name;
+    sel.appendChild(opt);
+  });
+}
+
+// ─── Stage mappings ──────────────────────────────────────────────────
+function renderStageRows(rows) {
+  const tbody = document.getElementById("stageRows");
+  tbody.innerHTML = "";
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-muted" style="padding:18px;text-align:center" data-i18n="crm.admin.empty"></td></tr>`;
+    applyLang(true);
+    return;
+  }
+  rows.forEach(r => {
+    const scope = r.campaign_id
+      ? `<span class="text-muted">${escapeHtml(r.campaign_name || "")}</span>`
+      : `<span class="scope-global" data-i18n="crm.admin.scope.global">${escapeHtml(t("crm.admin.scope.global"))}</span>`;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(r.raw_stage)}</td>
+      <td><span class="outcome-chip outcome-${r.normalized_stage.toLowerCase()}">${escapeHtml(t("crm.stages." + r.normalized_stage))}</span></td>
+      <td>${scope}</td>
+      <td>${escapeHtml(r.created_by_name || "—")}</td>
+      <td style="text-align:end">
+        <button class="btn btn-sm btn-danger" data-mid="${r.id}" data-raw="${escapeHtml(r.raw_stage)}">
+          <span data-i18n="common.delete"></span>
+        </button>
+      </td>
+    `;
+    tr.querySelector("button").addEventListener("click", (e) => {
+      const id = parseInt(e.currentTarget.getAttribute("data-mid"), 10);
+      const raw = e.currentTarget.getAttribute("data-raw");
+      openDeleteConfirm("stage", id, raw);
+    });
+    tbody.appendChild(tr);
+  });
+  applyLang(true);
+}
+
+async function addStageMapping() {
+  const raw = document.getElementById("newStageRaw").value.trim();
+  const normalized = document.getElementById("newStageNormalized").value;
+  const scope = document.getElementById("newStageScope").value;
+  if (!raw) { toast(t("errors.required_fields_missing"), "error"); return; }
+  const body = {
+    raw_stage: raw,
+    normalized_stage: normalized,
+    campaign_id: scope === "all" ? null : parseInt(scope, 10),
+  };
+  try {
+    const r = await api("/api/crm/stage-mappings", { method: "POST", body });
+    toast(formatRecalcToast(r.affected_campaigns), "success");
+    document.getElementById("newStageRaw").value = "";
+    await loadAll();
+    if (typeof refreshInterventionBadge === "function") refreshInterventionBadge();
+  } catch (e) { toastError(e); }
+}
+
+function renderStageSuggestions(rows) {
+  const ul = document.getElementById("stageSuggestions");
+  ul.innerHTML = "";
+  if (!rows.length) {
+    ul.innerHTML = `<li class="text-muted" data-i18n="crm.admin.suggestions.empty_stages"></li>`;
+    applyLang(true);
+    return;
+  }
+  rows.forEach(r => {
+    const li = document.createElement("li");
+    li.className = "suggestion-row";
+    li.innerHTML = `
+      <span class="suggestion-name">${escapeHtml(r.raw_stage)}</span>
+      <span class="suggestion-count">${r.count}</span>
+      <button class="btn btn-sm" data-i18n="crm.admin.suggestions.map">${escapeHtml(t("crm.admin.suggestions.map"))}</button>
+    `;
+    li.querySelector("button").addEventListener("click", () => {
+      // Prefill the add form and switch into the right state — saves the
+      // admin a copy-paste.
+      document.getElementById("newStageRaw").value = r.raw_stage;
+      document.getElementById("newStageRaw").focus();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    ul.appendChild(li);
+  });
+}
+
+// ─── Rep mappings ────────────────────────────────────────────────────
+function renderRepRows(rows) {
+  const tbody = document.getElementById("repRows");
+  tbody.innerHTML = "";
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-muted" style="padding:18px;text-align:center" data-i18n="crm.admin.empty"></td></tr>`;
+    applyLang(true);
+    return;
+  }
+  rows.forEach(r => {
+    const scope = r.campaign_id
+      ? `<span class="text-muted">${escapeHtml(r.campaign_name || "")}</span>`
+      : `<span class="scope-global">${escapeHtml(t("crm.admin.scope.global"))}</span>`;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(r.raw_name)}</td>
+      <td>${escapeHtml(r.sales_user_name || "—")}</td>
+      <td>${scope}</td>
+      <td>${escapeHtml(r.created_by_name || "—")}</td>
+      <td style="text-align:end">
+        <button class="btn btn-sm btn-danger" data-mid="${r.id}" data-raw="${escapeHtml(r.raw_name)}">
+          <span data-i18n="common.delete"></span>
+        </button>
+      </td>
+    `;
+    tr.querySelector("button").addEventListener("click", (e) => {
+      const id = parseInt(e.currentTarget.getAttribute("data-mid"), 10);
+      const raw = e.currentTarget.getAttribute("data-raw");
+      openDeleteConfirm("rep", id, raw);
+    });
+    tbody.appendChild(tr);
+  });
+  applyLang(true);
+}
+
+async function addRepMapping() {
+  const raw = document.getElementById("newRepRaw").value.trim();
+  const userId = document.getElementById("newRepUser").value;
+  const scope = document.getElementById("newRepScope").value;
+  if (!raw || !userId) { toast(t("errors.required_fields_missing"), "error"); return; }
+  const body = {
+    raw_name: raw,
+    sales_user_id: parseInt(userId, 10),
+    campaign_id: scope === "all" ? null : parseInt(scope, 10),
+  };
+  try {
+    const r = await api("/api/crm/sales-rep-mappings", { method: "POST", body });
+    toast(formatRecalcToast(r.affected_campaigns), "success");
+    document.getElementById("newRepRaw").value = "";
+    await loadAll();
+    if (typeof refreshInterventionBadge === "function") refreshInterventionBadge();
+  } catch (e) { toastError(e); }
+}
+
+function renderRepSuggestions(rows) {
+  const ul = document.getElementById("repSuggestions");
+  ul.innerHTML = "";
+  if (!rows.length) {
+    ul.innerHTML = `<li class="text-muted" data-i18n="crm.admin.suggestions.empty_reps"></li>`;
+    applyLang(true);
+    return;
+  }
+  rows.forEach(r => {
+    const li = document.createElement("li");
+    li.className = "suggestion-row";
+    li.innerHTML = `
+      <span class="suggestion-name">${escapeHtml(r.raw_name)}</span>
+      <span class="suggestion-count">${r.count}</span>
+      <button class="btn btn-sm" data-i18n="crm.admin.suggestions.map">${escapeHtml(t("crm.admin.suggestions.map"))}</button>
+    `;
+    li.querySelector("button").addEventListener("click", () => {
+      document.getElementById("newRepRaw").value = r.raw_name;
+      // Switch tabs if we're not on the reps tab — defensive in case the
+      // suggestion is clicked from a stale render.
+      document.querySelector('.crm-tab[data-tab="reps"]').click();
+      document.getElementById("newRepRaw").focus();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    ul.appendChild(li);
+  });
+}
+
+// ─── DELETE confirm flow ─────────────────────────────────────────────
+function openDeleteConfirm(kind, id, label) {
+  pendingDelete = { kind, id };
+  document.getElementById("deleteConfirmTarget").textContent = label || "";
+  // Bind once per open to avoid stacking listeners.
+  const go = document.getElementById("deleteConfirmGo");
+  go.onclick = doDelete;
+  openModal("deleteConfirmModal");
+}
+
+async function doDelete() {
+  if (!pendingDelete) return;
+  const { kind, id } = pendingDelete;
+  pendingDelete = null;
+  closeModal("deleteConfirmModal");
+  const path = kind === "stage"
+    ? `/api/crm/stage-mappings/${id}`
+    : `/api/crm/sales-rep-mappings/${id}`;
+  try {
+    const r = await api(path, { method: "DELETE" });
+    toast(formatRecalcToast(r.affected_campaigns), "success");
+    await loadAll();
+    if (typeof refreshInterventionBadge === "function") refreshInterventionBadge();
+  } catch (e) { toastError(e); }
+}
+
+function formatRecalcToast(affected) {
+  const n = (affected || []).length;
+  if (n === 0) return t("common.saved");
+  return t("crm.admin.recalculated").replace("{count}", String(n));
+}
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function onLangChange() { loadAll(); }
+
+loadAll();
+</script>
+
+<style>
+  .crm-tabs {
+    display: flex; gap: 4px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px; padding: 0 4px;
+  }
+  .crm-tab {
+    background: transparent; border: none; padding: 12px 18px;
+    font: inherit; color: var(--text-muted); cursor: pointer;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .crm-tab:hover { color: var(--text); background: var(--surface-recessed); }
+  .crm-tab.is-active { color: var(--brand); border-bottom-color: var(--brand); font-weight: 600; }
+
+  .scope-global {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+    padding: 2px 10px; border-radius: 9999px; text-transform: uppercase;
+    background: var(--brand-soft); color: var(--brand);
+  }
+
+  .outcome-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 9px; border-radius: 9999px;
+    font-size: 11px; font-weight: 500;
+    background: var(--surface-recessed); border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  .outcome-chip.outcome-no_answer    { background: rgba(196,114,0,0.10); border-color: rgba(196,114,0,0.20); color: var(--warning); }
+  .outcome-chip.outcome-following    { background: var(--brand-soft); border-color: rgba(71,77,197,0.18); color: var(--brand); }
+  .outcome-chip.outcome-meeting      { background: rgba(0,103,98,0.10); border-color: rgba(0,103,98,0.22); color: var(--accent-2); }
+  .outcome-chip.outcome-cancellation { background: rgba(186,26,26,0.08); border-color: rgba(186,26,26,0.20); color: var(--danger); }
+  .outcome-chip.outcome-interested   { background: rgba(64,220,209,0.14); border-color: rgba(64,220,209,0.28); color: var(--accent-2); }
+  .outcome-chip.outcome-request      { background: rgba(124,131,253,0.10); border-color: rgba(124,131,253,0.22); color: var(--brand); }
+
+  .suggestions-list { list-style: none; margin: 0; padding: 0; }
+  .suggestion-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .suggestion-row:last-child { border-bottom: none; }
+  .suggestion-name { flex: 1; font-weight: 500; }
+  .suggestion-count {
+    font-size: 11px; font-weight: 700;
+    padding: 2px 10px; border-radius: 9999px;
+    background: rgba(196,114,0,0.12); color: var(--warning);
+  }
+</style>
+{% endblock %}

@@ -1,0 +1,780 @@
+{% extends "base.html" %}
+{% block title %}Ain KPI{% endblock %}
+
+{% block head %}
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title" data-i18n="dash.title"></h1>
+    <p class="page-subtitle" data-i18n="dash.subtitle"></p>
+  </div>
+  <div class="flex gap-2">
+    <button class="btn" onclick="exportCSV()" data-i18n="common.export"></button>
+    <button class="btn btn-primary" onclick="window.print()" data-i18n="common.print"></button>
+  </div>
+</div>
+
+<!-- Headline: avg KPI as the lead, gauge as visual companion. Mirrors TL page pattern. -->
+<div class="tl-headline">
+  <div class="tl-headline-score">
+    <div class="tl-headline-label" data-i18n="dash.avg_kpi"></div>
+    <div class="tl-headline-value" id="hero_avg">—</div>
+    <div class="tl-headline-rating" id="hero_rating"></div>
+    <div class="tl-headline-meta" id="hero_meta"></div>
+  </div>
+  <div class="tl-headline-gauge">
+    <div id="chartHealthGauge" class="plotly-container short"><div class="chart-skel"></div></div>
+  </div>
+</div>
+
+<!-- Three clickable summary tiles (Avg KPI moved into headline above) -->
+<div class="bento" id="kpiTiles">
+  <div class="kpi-tile tile-brand span-4 is-clickable" id="tile_n_card" data-i18n-aria-label="dash.tile_action_total" tabindex="0" role="button">
+    <div class="kpi-tile-head">
+      <div class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">groups</span></div>
+      <div class="kpi-tile-label" data-i18n="dash.sales_count"></div>
+    </div>
+    <div class="kpi-tile-value" id="tile_n">—</div>
+    <div class="kpi-tile-sub" id="tile_n_sub">&nbsp;</div>
+  </div>
+
+  <div class="kpi-tile tile-coral span-4 is-clickable" id="tile_top_card" data-i18n-aria-label="dash.tile_action_top" tabindex="0" role="button">
+    <div class="kpi-tile-head">
+      <div class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">emoji_events</span></div>
+      <div class="kpi-tile-label" data-i18n="dash.top"></div>
+    </div>
+    <div class="kpi-tile-value is-name" id="tile_top">—</div>
+    <div class="kpi-tile-sub" id="tile_top_sub">&nbsp;</div>
+  </div>
+
+  <div class="kpi-tile tile-warm span-4 is-clickable" id="tile_low_card" data-i18n-aria-label="dash.tile_action_attention" tabindex="0" role="button">
+    <div class="kpi-tile-head">
+      <div class="kpi-tile-icon"><span class="material-symbols-outlined" aria-hidden="true">warning</span></div>
+      <div class="kpi-tile-label" data-i18n="dash.needs_attention"></div>
+    </div>
+    <div class="kpi-tile-value" id="tile_low">—</div>
+    <div class="kpi-tile-sub" data-i18n="dash.below_55"></div>
+  </div>
+</div>
+
+<div class="controls controls-sticky">
+  <div class="field">
+    <label data-i18n="common.month"></label>
+    <div id="dateRangeHost"></div>
+  </div>
+  <div class="field">
+    <label data-i18n="common.filter"></label>
+    <select id="selSort" onchange="onManualFilter()">
+      <option value="score" data-i18n="dash.sort_by_score"></option>
+      <option value="name" data-i18n="dash.sort_by_name"></option>
+    </select>
+  </div>
+  <div class="field">
+    <label data-i18n="dash.rating"></label>
+    <select id="selRating" onchange="onManualFilter()">
+      <option value="all" data-i18n="common.all"></option>
+      <option value="Excellent" data-i18n="rating.Excellent">Excellent</option>
+      <option value="V.Good" data-i18n="rating.V.Good">V.Good</option>
+      <option value="Good" data-i18n="rating.Good">Good</option>
+      <option value="Medium" data-i18n="rating.Medium">Medium</option>
+      <option value="Weak" data-i18n="rating.Weak">Weak</option>
+      <option value="Bad" data-i18n="rating.Bad">Bad</option>
+    </select>
+  </div>
+  <div class="field" style="flex:1;min-width:180px">
+    <label data-i18n="common.search"></label>
+    <input type="text" id="selSearch" oninput="onManualFilter()" data-i18n-placeholder="filters.search_user_ph" autocomplete="off">
+  </div>
+  <div class="spacer"></div>
+</div>
+
+<!-- Secondary KPIs (operational): leads, calls, deals, conversion -->
+<div class="stats-grid stagger" id="opStats"></div>
+
+<!-- PRIMARY analytical surfaces — always visible, full-width, ranked by actionability -->
+<div class="chart-card">
+  <h3 data-i18n="dash.chart_leaderboard"></h3>
+  <div id="chartTeamPerf" class="plotly-container tall"><div class="chart-skel"></div></div>
+</div>
+
+<div class="chart-card">
+  <h3 data-i18n="dash.chart_breakdown"></h3>
+  <div id="chartBreakdown" class="plotly-container tall"><div class="chart-skel"></div></div>
+</div>
+
+<div class="chart-card">
+  <h3 data-i18n="dash.chart_kpi_actual_target"></h3>
+  <div id="chartActualTarget" class="plotly-container"><div class="chart-skel"></div></div>
+</div>
+
+<!-- Deep dive — collapsed by default, opens on demand. Five secondary charts. -->
+<details class="dash-deep-dive">
+  <summary class="dash-deep-dive-summary">
+    <span class="material-symbols-outlined" aria-hidden="true">analytics</span>
+    <span data-i18n="dash.deep_dive"></span>
+    <span class="material-symbols-outlined dash-deep-dive-chevron" aria-hidden="true">expand_more</span>
+  </summary>
+  <div class="bento">
+    <div class="chart-card span-4">
+      <h3 data-i18n="dash.metric_pillars"></h3>
+      <div id="chartRadarOverview" class="plotly-container short"><div class="chart-skel"></div></div>
+    </div>
+    <div class="chart-card span-4">
+      <h3 data-i18n="dash.chart_funnel"></h3>
+      <div id="chartFunnel" class="plotly-container short"><div class="chart-skel"></div></div>
+    </div>
+    <div class="chart-card span-4">
+      <h3 data-i18n="dash.chart_distribution"></h3>
+      <div id="chartRatings" class="plotly-container short"><div class="chart-skel"></div></div>
+    </div>
+  </div>
+  <div class="bento">
+    <div class="chart-card span-4">
+      <h3 data-i18n="dash.chart_status_split"></h3>
+      <div id="chartStatus" class="plotly-container short"><div class="chart-skel"></div></div>
+    </div>
+    <div class="chart-card span-8">
+      <h3 data-i18n="dash.chart_heatmap"></h3>
+      <div id="chartHeatmap" class="plotly-container tall"><div class="chart-skel"></div></div>
+    </div>
+  </div>
+</details>
+
+<!-- Detailed table -->
+<div class="card-title mb-2" style="margin-top:8px;">
+  <span data-i18n="dash.chart_pipeline"></span>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th style="width:50px">#</th>
+      <th data-i18n="admin.user"></th>
+      <th style="width:200px" data-i18n="dash.avg_kpi"></th>
+      <th style="width:100px" data-i18n="dash.rating"></th>
+      <th style="width:120px" data-i18n="dash.calls"></th>
+      <th style="width:120px" data-i18n="dash.deals"></th>
+      <th style="width:120px" data-i18n="dash.meetings"></th>
+      <th style="width:120px" data-i18n="dash.crm"></th>
+      <th style="width:140px" data-i18n="dash.weakest"></th>
+      <th style="width:90px" data-i18n="dash.status"></th>
+      <th style="width:80px"></th>
+    </tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<div id="detailPanel" class="hidden mt-2"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}?v=flat51"></script>
+<script src="{{ url_for('static', filename='js/date_range.js') }}?v=flat51"></script>
+<script>
+let allData = [];
+let _drCtrl = null;
+// One-shot fallback: if the default range (last_30) returns empty on first
+// paint, the page programmatically widens to YTD so the user always sees
+// data on first open. Honors localStorage / URL state — only fires when
+// neither was already set.
+let _drFallbackArmed = true;
+
+const KPI_KEYS = ["calls","meetings","crm_pct","deals","reports","reservations","attitude","presentation","followup_pct","behaviour","appearance","attendance_pct","hr_roles"];
+
+function kpiLabel(key) { return t("kpi." + key); }
+
+async function loadAll() {
+  if (!_drCtrl) return;
+  try {
+    // detail=1 returns the per-KPI breakdown the charts (radar, heatmap,
+    // funnel, per-KPI bar, actual-vs-target) and the table both consume.
+    // dedupe=user collapses (user, month) pairs to the latest row per
+    // user — without it the leaderboard duplicates a rep once per month
+    // covered by the range.
+    const qs = _drCtrl.toQueryString({ detail: 1, dedupe: 'user' });
+    allData = await api(`/api/kpi/report?${qs}`);
+    if (_drFallbackArmed && allData.length === 0
+        && _drCtrl.getRange().preset !== "ytd") {
+      // Empty result on first paint → widen to YTD once. setRange triggers
+      // onChange → loadAll, but the flag is now disarmed so we won't loop.
+      _drFallbackArmed = false;
+      _drCtrl.setRange({ preset: "ytd" });
+      return;
+    }
+    _drFallbackArmed = false;
+    render();
+  } catch (e) { _drFallbackArmed = false; toastError(e); }
+}
+
+function render() {
+  const sort = document.getElementById("selSort").value;
+  const ratingFilter = document.getElementById("selRating").value;
+  const searchEl = document.getElementById("selSearch");
+  const search = searchEl ? (searchEl.value || "").trim().toLowerCase() : "";
+  let rows = [...allData];
+  if (ratingFilter !== "all") rows = rows.filter(r => r.rating === ratingFilter);
+  if (search) {
+    rows = rows.filter(r =>
+      (r.user_name || "").toLowerCase().includes(search) ||
+      (r.username || "").toLowerCase().includes(search)
+    );
+  }
+  // Score sort honours the "needs attention" flag set by the warm tile —
+  // worst-first when the user clicked the alert tile, best-first otherwise.
+  rows.sort(sort === "score"
+    ? (a, b) => {
+        const av = parseFloat(a.total_score) || 0;
+        const bv = parseFloat(b.total_score) || 0;
+        return _attentionFirst ? (av - bv) : (bv - av);
+      }
+    : (a, b) => (a.user_name || "").localeCompare(b.user_name || ""));
+
+  renderTiles(rows);
+  renderOpStats(rows);
+  renderTable(rows);
+  renderCharts(rows);
+}
+
+function getRating(s) {
+  if (s >= 90) return "Excellent";
+  if (s >= 75) return "V.Good";
+  if (s >= 55) return "Good";
+  if (s >= 40) return "Medium";
+  if (s >= 25) return "Weak";
+  return "Bad";
+}
+
+function ratingClassName(rating) {
+  return ({ "Excellent":"excellent","V.Good":"vgood","Good":"good","Medium":"medium","Weak":"weak","Bad":"bad" })[rating] || "good";
+}
+
+function renderTiles(rows) {
+  const n = rows.length;
+  const avg = n ? rows.reduce((a, r) => a + (parseFloat(r.total_score) || 0), 0) / n : 0;
+  const top = rows[0];
+  const below55 = rows.filter(r => (parseFloat(r.total_score) || 0) < 55).length;
+  const salesDone = rows.filter(r => r.sales_submitted_at).length;
+  const deDone = rows.filter(r => r.dataentry_submitted_at).length;
+
+  // Headline (avg KPI as hero)
+  const heroAvgEl = document.getElementById("hero_avg");
+  const rating = getRating(avg);
+  const ratingCls = (typeof ratingClass === "function" ? ratingClass(rating) : "").replace("badge-", "");
+  heroAvgEl.textContent = avg.toFixed(1) + "%";
+  heroAvgEl.className = "tl-headline-value is-" + ratingCls;
+  document.getElementById("hero_rating").textContent = t("rating." + rating);
+  // Meta line: "12 sales reps · Top: Ahmed Hassan (87%) · 5 below threshold"
+  const topName = top ? (top.user_name || "—") : "—";
+  const topScore = top ? (parseFloat(top.total_score || 0).toFixed(1) + "%") : "—";
+  const meta = document.getElementById("hero_meta");
+  meta.innerHTML = top
+    ? `<strong>${n}</strong> ${t("dash.sales_count")} · ${t("dash.top")}: <strong>${escapeHTML(topName)}</strong> (${topScore}) · <strong>${below55}</strong> ${t("dash.below_55")}`
+    : `<strong>${n}</strong> ${t("dash.sales_count")}`;
+
+  // Mini-tiles row (3 clickable cards)
+  document.getElementById("tile_n").textContent = n;
+  document.getElementById("tile_n_sub").textContent =
+    `${salesDone}/${n} ${t("dash.sales_submitted")} · ${deDone}/${n} ${t("dash.eval_done")}`;
+
+  if (top) {
+    document.getElementById("tile_top").textContent = top.user_name || "—";
+    document.getElementById("tile_top_sub").textContent =
+      parseFloat(top.total_score || 0).toFixed(1) + "% · " + t("rating." + (top.rating || "Pending"));
+  } else {
+    document.getElementById("tile_top").textContent = "—";
+    document.getElementById("tile_top_sub").innerHTML = "&nbsp;";
+  }
+
+  document.getElementById("tile_low").textContent = below55;
+}
+
+function escapeHTML(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
+    {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]
+  ));
+}
+
+// ─── Tile click actions — Action 2 ─────────────────────────────────
+function _scrollToTable() {
+  const tbl = document.querySelector('.table-wrap');
+  if (tbl) tbl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function _wireTileClick(elId, handler) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.addEventListener('click', handler);
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  _wireTileClick('tile_n_card', () => {
+    // Sales count tile — just scroll, don't reorder. But CLEAR the
+    // attention flag so a previous "Needs Attention" click doesn't
+    // leave the list inverted.
+    _attentionFirst = false;
+    render();
+    _scrollToTable();
+  });
+
+  _wireTileClick('tile_top_card', () => {
+    // Top performer is row[0] after the score-sort.
+    // Clear attention flag — without this, clicking "Top Performer"
+    // after "Needs Attention" left the list still ASC, so showDetail
+    // opened the WORST rep instead of the best.
+    _attentionFirst = false;
+    const sort = document.getElementById('selSort');
+    if (sort) { sort.value = 'score'; }
+    render();
+    if (allData.length) {
+      const top = [...allData].sort((a,b) => (parseFloat(b.total_score)||0) - (parseFloat(a.total_score)||0))[0];
+      if (top) showDetail(top.user_id, top.month);
+    }
+  });
+
+  _wireTileClick('tile_low_card', () => {
+    // "Needs Attention" — surface the lowest scorers FIRST, but never hide
+    // the rest of the team. Previously this filtered to Bad/Weak only,
+    // which emptied the table whenever the team had no ratings that low
+    // (the actual symptom: blank screen on healthy teams). Now we just
+    // re-sort score ASC and clear the rating filter so every rep stays
+    // visible — worst at top, healthiest at bottom.
+    const ratingSel = document.getElementById('selRating');
+    const sortSel = document.getElementById('selSort');
+    if (ratingSel) ratingSel.value = 'all';
+    if (sortSel) sortSel.value = 'score';
+    _attentionFirst = true;
+    render();
+    _scrollToTable();
+  });
+});
+
+// Tile-click flag — when set, render() flips the score-sort comparator so
+// the worst scorers come first. Cleared when the user changes either the
+// sort or the rating filter manually so they regain control.
+let _attentionFirst = false;
+function onManualFilter() { _attentionFirst = false; render(); }
+
+function renderOpStats(rows) {
+  // Sum operational metrics
+  const sum = (k) => rows.reduce((a, r) => a + (r.breakdown && r.breakdown[k] ? r.breakdown[k].actual : 0), 0);
+  const totalLeads = rows.reduce((a, r) => a + (parseFloat(r.fresh_leads) || 0), 0);
+  const totalCalls = sum("calls");
+  const totalDeals = sum("deals");
+  const totalRes   = sum("reservations");
+  const totalMeetings = sum("meetings");
+  const convRate = totalLeads ? (totalDeals / totalLeads * 100) : 0;
+  const callsPerLead = totalLeads ? (totalCalls / totalLeads) : 0;
+
+  document.getElementById("opStats").innerHTML = `
+    <div class="stat success">
+      <div class="stat-icon"><span class="material-symbols-outlined" aria-hidden="true">inbox</span></div>
+      <div class="stat-label">${t("dash.total_leads")}</div>
+      <div class="stat-value">${fmtNum(totalLeads)}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-icon"><span class="material-symbols-outlined" aria-hidden="true">call</span></div>
+      <div class="stat-label">${t("dash.total_calls")}</div>
+      <div class="stat-value">${fmtNum(totalCalls)}</div>
+      <div class="stat-sub">${callsPerLead.toFixed(1)} ${t("dash.calls_per_lead")}</div>
+    </div>
+    <div class="stat accent">
+      <div class="stat-icon"><span class="material-symbols-outlined" aria-hidden="true">business_center</span></div>
+      <div class="stat-label">${t("dash.total_deals")}</div>
+      <div class="stat-value">${fmtNum(totalDeals)}</div>
+      <div class="stat-sub">${(rows.length ? totalDeals / rows.length : 0).toFixed(1)} ${t("dash.deals_per_rep")}</div>
+    </div>
+    <div class="stat warn">
+      <div class="stat-icon"><span class="material-symbols-outlined" aria-hidden="true">handshake</span></div>
+      <div class="stat-label">${t("dash.total_reservations")}</div>
+      <div class="stat-value">${fmtNum(totalRes)}</div>
+      <div class="stat-sub">${fmtNum(totalMeetings)} ${t("kpi.meetings")}</div>
+    </div>
+    <div class="stat ${convRate >= 3 ? 'success' : convRate >= 1.5 ? 'warn' : 'danger'}">
+      <div class="stat-icon"><span class="material-symbols-outlined" aria-hidden="true">bolt</span></div>
+      <div class="stat-label">${t("dash.conv_rate")}</div>
+      <div class="stat-value">${convRate.toFixed(2)}%</div>
+      <div class="stat-sub">${t("dash.lead_to_deal")}</div>
+    </div>
+  `;
+}
+
+// Deep-dive charts are deferred until the user opens the <details>. Drawing
+// at 0×0 (display:none parent) makes Plotly compute axes against zero pixels
+// and never recover, even after a resize. Track whether they've been drawn
+// for the current dataset.
+let _deepDiveDrawn = false;
+let _lastChartRows = null;
+
+const _NUMERIC_KPI_KEYS = ["calls","meetings","crm_pct","deals","reports","reservations","followup_pct","attendance_pct"];
+
+function renderCharts(rows) {
+  _lastChartRows = rows;
+  if (!rows.length || typeof Plotly === 'undefined') {
+    ["chartHealthGauge","chartRadarOverview","chartFunnel","chartRatings","chartTeamPerf","chartBreakdown","chartActualTarget","chartStatus","chartHeatmap"].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      // Cancel any pending Plotly draw before stomping innerHTML, otherwise
+      // the deferred newPlot fires after this and renders chart over "No data".
+      if (Charts.cancelPending) Charts.cancelPending(id);
+      el.innerHTML = `<div class="empty-state" style="padding:30px">${t("dash.no_data")}</div>`;
+    });
+    _deepDiveDrawn = false;
+    return;
+  }
+
+  renderPrimaryCharts(rows);
+
+  // Reset so any prior deep-dive paint is treated as stale for the new dataset.
+  _deepDiveDrawn = false;
+  // If the deep-dive panel is already open (e.g. user opened it before
+  // changing filters or language), redraw immediately so it stays in sync.
+  const detailsEl = document.querySelector('.dash-deep-dive');
+  if (detailsEl && detailsEl.open) {
+    renderDeepDiveCharts(rows);
+    _deepDiveDrawn = true;
+  }
+}
+
+function renderPrimaryCharts(rows) {
+  const sorted = [...rows].sort((a,b) => (parseFloat(b.total_score)||0) - (parseFloat(a.total_score)||0));
+
+  // 1) Health gauge: avg score across team
+  const avg = rows.reduce((a, r) => a + (parseFloat(r.total_score) || 0), 0) / rows.length;
+  Charts.drawGauge("chartHealthGauge", avg, { target: 75 });
+
+  // 5) Leaderboard horizontal bar (top 12)
+  const topN = sorted.slice(0, 12);
+  Charts.drawHorizontalBar("chartTeamPerf", {
+    x: topN.map(r => parseFloat(r.total_score) || 0).reverse(),
+    y: topN.map(r => r.user_name).reverse(),
+    colors: topN.map(r => Charts.scoreColorHex(parseFloat(r.total_score) || 0)).reverse(),
+    labels: topN.map(r => (parseFloat(r.total_score)||0).toFixed(1) + "%").reverse(),
+  }, { measureLabels: true });
+
+  // 6) Per-KPI achievement bar
+  const kpiAvgs = KPI_KEYS.map(key => {
+    const values = rows.map(r => (r.breakdown && r.breakdown[key]) ? r.breakdown[key].achievement_pct : 0);
+    const a = values.length ? values.reduce((a,b) => a+b, 0) / values.length : 0;
+    return { key, avg: a };
+  });
+  Charts.drawBarChart("chartBreakdown", {
+    x: kpiAvgs.map(k => kpiLabel(k.key)),
+    y: kpiAvgs.map(k => k.avg),
+    colors: kpiAvgs.map(k => Charts.scoreColorHex(k.avg)),
+    labels: kpiAvgs.map(k => k.avg.toFixed(0) + "%"),
+  }, { xangle: -25 });
+
+  // 7) Actual vs Target grouped bars (numeric KPIs)
+  const actuals = _NUMERIC_KPI_KEYS.map(k =>
+    rows.reduce((a, r) => a + (r.breakdown && r.breakdown[k] ? r.breakdown[k].actual : 0), 0)
+  );
+  const targets = _NUMERIC_KPI_KEYS.map(k =>
+    rows.reduce((a, r) => a + (r.breakdown && r.breakdown[k] ? r.breakdown[k].target : 0), 0)
+  );
+  // Brand purple (actual) vs warning amber (target) — far apart on the
+  // colour wheel so the eye distinguishes them instantly. The previous
+  // brand vs brand3 was two shades of purple and read as one colour.
+  Charts.drawGroupedBar("chartActualTarget",
+    [
+      { name: t("dash.actual"), values: actuals, color: Charts.COLORS.brand },
+      { name: t("dash.target"), values: targets, color: Charts.COLORS.warning },
+    ],
+    _NUMERIC_KPI_KEYS.map(k => kpiLabel(k)),
+    { showlegend: true, xaxis: { tickangle: -25 } }
+  );
+}
+
+function renderDeepDiveCharts(rows) {
+  if (!rows || !rows.length || typeof Plotly === 'undefined') return;
+
+  const sorted = [...rows].sort((a,b) => (parseFloat(b.total_score)||0) - (parseFloat(a.total_score)||0));
+
+  // 2) Radar: average achievement across all 13 KPI categories
+  const radarLabels = KPI_KEYS.map(k => kpiLabel(k));
+  const radarValues = KPI_KEYS.map(k => {
+    const vals = rows.map(r => (r.breakdown && r.breakdown[k]) ? r.breakdown[k].achievement_pct : 0);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  });
+  Charts.drawRadarChart("chartRadarOverview", { labels: radarLabels, values: radarValues });
+
+  // 3) Funnel: leads → calls → meetings → reservations → deals (totals)
+  const totalLeads = rows.reduce((a, r) => a + (parseFloat(r.fresh_leads) || 0), 0);
+  const sumKey = (k) => rows.reduce((a, r) => a + (r.breakdown && r.breakdown[k] ? r.breakdown[k].actual : 0), 0);
+  Charts.drawFunnel("chartFunnel", {
+    y: [t("funnel.leads"), t("funnel.calls"), t("funnel.meetings"), t("funnel.reservations"), t("funnel.deals")],
+    x: [totalLeads, sumKey("calls"), sumKey("meetings"), sumKey("reservations"), sumKey("deals")],
+  });
+
+  // 4) Rating distribution donut
+  const ratings = ["Excellent","V.Good","Good","Medium","Weak","Bad"];
+  const ratingCounts = ratings.map(r => rows.filter(x => x.rating === r).length);
+  const ratingColors = [
+    Charts.COLORS.accent2,
+    Charts.COLORS.brand,
+    Charts.COLORS.brand2,
+    Charts.COLORS.warning2,
+    '#ff923c',
+    Charts.COLORS.danger
+  ];
+  const filteredRatings = [], filteredCounts = [], filteredColors = [];
+  ratings.forEach((r, i) => {
+    if (ratingCounts[i] > 0) {
+      filteredRatings.push(t("rating." + r));
+      filteredCounts.push(ratingCounts[i]);
+      filteredColors.push(ratingColors[i]);
+    }
+  });
+  if (filteredRatings.length) {
+    Charts.drawDonut("chartRatings", {
+      labels: filteredRatings,
+      values: filteredCounts,
+      colors: filteredColors,
+    }, { centerText: rows.length + "" });
+  } else if (Charts.cancelPending) {
+    Charts.cancelPending("chartRatings");
+    const el = document.getElementById("chartRatings");
+    if (el) el.innerHTML = `<div class="empty-state" style="padding:30px">${t("dash.no_data")}</div>`;
+  }
+
+  // 8) Status donut: completed / in-progress / not-started
+  const completed = rows.filter(r => r.dataentry_submitted_at).length;
+  const inProgress = rows.filter(r => r.sales_submitted_at && !r.dataentry_submitted_at).length;
+  const notStarted = rows.length - completed - inProgress;
+  const statusVals = [completed, inProgress, notStarted].filter(v => v > 0);
+  const statusLabels = [];
+  const statusColors = [];
+  if (completed)  { statusLabels.push(t("dash.completed"));   statusColors.push(Charts.COLORS.accent2); }
+  if (inProgress) { statusLabels.push(t("dash.in_progress")); statusColors.push(Charts.COLORS.warning2); }
+  if (notStarted) { statusLabels.push(t("dash.not_started")); statusColors.push(Charts.COLORS.danger2); }
+  if (statusVals.length) {
+    Charts.drawDonut("chartStatus", {
+      labels: statusLabels,
+      values: statusVals,
+      colors: statusColors,
+    }, { centerText: rows.length + "" });
+  }
+
+  // 9) Heatmap: top 12 reps × KPI achievement %
+  const heatRows = sorted.slice(0, 12);
+  const heatX = _NUMERIC_KPI_KEYS.map(k => kpiLabel(k));
+  const heatY = heatRows.map(r => r.user_name).reverse();
+  const heatZ = heatRows.slice().reverse().map(r =>
+    _NUMERIC_KPI_KEYS.map(k => (r.breakdown && r.breakdown[k]) ? r.breakdown[k].achievement_pct : 0)
+  );
+  Charts.drawHeatmap("chartHeatmap", { x: heatX, y: heatY, z: heatZ });
+
+  // Safety net for any stale 0×0 layout that snuck in before the panel opened.
+  requestAnimationFrame(() => {
+    ["chartRadarOverview","chartFunnel","chartRatings","chartStatus","chartHeatmap"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && typeof Plotly !== 'undefined' && Plotly.Plots && Plotly.Plots.resize) {
+        try { Plotly.Plots.resize(el); } catch (_) {}
+      }
+    });
+  });
+}
+
+// Wire up the deep-dive toggle once. The <details> is in the DOM at parse time
+// since this script runs in the scripts block after the body.
+document.addEventListener("DOMContentLoaded", () => {
+  const detailsEl = document.querySelector('.dash-deep-dive');
+  if (!detailsEl) return;
+  detailsEl.addEventListener('toggle', () => {
+    if (detailsEl.open && !_deepDiveDrawn && _lastChartRows && _lastChartRows.length) {
+      renderDeepDiveCharts(_lastChartRows);
+      _deepDiveDrawn = true;
+    }
+  });
+});
+
+function renderTable(rows) {
+  const tbody = document.getElementById("tbody");
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="11" class="table-empty">' + t("dash.no_data") + '</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map((r, i) => {
+    const score = parseFloat(r.total_score) || 0;
+    const rating = r.rating || "Pending";
+    const bd = r.breakdown || {};
+    let worstKey = "calls", worstPct = 100;
+    Object.entries(bd).forEach(([k, v]) => {
+      if (v.achievement_pct < worstPct) { worstPct = v.achievement_pct; worstKey = k; }
+    });
+    const fresh = parseFloat(r.fresh_leads) || 0;
+    const rankCls = i === 0 ? "r1" : i === 1 ? "r2" : i === 2 ? "r3" : "";
+
+    return `<tr class="clickable" onclick="showDetail(${r.user_id},'${r.month}')">
+      <td><span class="rank ${rankCls}">${i + 1}</span></td>
+      <td>
+        <div class="row-actor">
+          <div class="avatar avatar-sm${r.avatar_url ? ' avatar-img' : ''}">${
+            r.avatar_url
+              ? `<img src="${escapeHTML(r.avatar_url)}" alt="">`
+              : (r.user_name||'?')[0]
+          }</div>
+          <div>
+            <div class="row-actor-name">${r.user_name}</div>
+            <div class="row-actor-sub">${t("dash.fresh_leads_short")}: ${fresh}</div>
+          </div>
+        </div>
+      </td>
+      <td>
+        <div class="score-cell">
+          <span class="score-cell-num">${score.toFixed(1)}%</span>
+          <div class="bar score-cell-bar"><div class="bar-fill ${scoreColor(score)}" style="width:${score}%"></div></div>
+        </div>
+      </td>
+      <td><span class="badge ${ratingClass(rating)}">${t("rating." + rating)}</span></td>
+      <td>${fmtCell(bd.calls)}</td>
+      <td>${fmtCell(bd.deals)}</td>
+      <td>${fmtCell(bd.meetings)}</td>
+      <td>${fmtCell(bd.crm_pct)}</td>
+      <td class="weakest-cell">
+        ${kpiLabel(worstKey)} <span class="${worstPct < 50 ? 'text-danger' : 'text-muted'}">(${worstPct.toFixed(0)}%)</span>
+      </td>
+      <td>
+        ${statusPill('eval',  !!r.dataentry_submitted_at)}
+      </td>
+      <td><button class="btn btn-sm" onclick="event.stopPropagation();showDetail(${r.user_id},'${r.month}')">${t("common.details")}</button></td>
+    </tr>`;
+  }).join("");
+}
+
+function statusPill(kind, done) {
+  // kind: 'sales' (the rep submitted their KPI) or 'eval' (data entry evaluated them)
+  const label = kind === 'sales' ? t("dash.status_sales") : t("dash.status_eval");
+  const icon  = done ? "check_circle" : "radio_button_unchecked";
+  const cls   = done ? "is-done" : "is-pending";
+  return `<span class="status-pill ${cls}">
+    <span class="material-symbols-outlined" aria-hidden="true">${icon}</span>${label}
+  </span>`;
+}
+
+function fmtCell(kpi) {
+  if (!kpi) return '<span class="text-dim">—</span>';
+  const col = kpi.achievement_pct >= 80 ? "success" : kpi.achievement_pct >= 55 ? "warn" : "danger";
+  return `<div style="font-size:12px;line-height:1.4">
+    <span class="text-${col}" style="font-weight:700;font-family:Inter">${kpi.actual}</span>
+    <span class="text-dim">/ ${kpi.target}</span>
+    <div class="text-muted" style="font-size:10px">${kpi.achievement_pct.toFixed(0)}%</div>
+  </div>`;
+}
+
+function showDetail(userId, month) {
+  const entry = allData.find(r => r.user_id === userId && r.month === month);
+  if (!entry) return;
+  const score = parseFloat(entry.total_score) || 0;
+  const rating = entry.rating || "Pending";
+  const bd = entry.breakdown || {};
+  const L = parseFloat(entry.fresh_leads) || 0;
+
+  let kpiHTML = Object.entries(bd).map(([k, v]) => {
+    const col = scoreColor(v.achievement_pct);
+    return `<div class="kpi-cell">
+      <div class="kpi-cell-label">${kpiLabel(k)}</div>
+      <div class="kpi-cell-value text-${col}">${v.achievement_pct.toFixed(0)}%</div>
+      <div class="kpi-cell-detail">${v.actual} / ${v.target} · ${v.weighted_score}/${v.weight} pts</div>
+      <div class="bar kpi-cell-bar"><div class="bar-fill ${col}" style="width:${Math.min(v.achievement_pct,100)}%"></div></div>
+    </div>`;
+  }).join("");
+
+  const panel = document.getElementById("detailPanel");
+  panel.classList.remove("hidden");
+  panel.innerHTML = `<div class="card">
+    <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+      <div>
+        <div style="font-size:18px;font-weight:700">${entry.user_name}
+          <span class="badge ${ratingClass(rating)}" style="margin-inline-start:8px">${t("rating." + rating)}</span>
+        </div>
+        <div class="text-muted" style="font-size:12px">${fmtMonth(entry.month)} — ${t("sales.fresh_leads")}: ${L}</div>
+        ${entry.notes ? `<div class="text-muted mt-1" style="font-size:12px">${entry.notes}</div>` : ""}
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="text-center">
+          <div class="stat-value lg text-${scoreColor(score)}">${score.toFixed(1)}%</div>
+          <div class="stat-label">${t("sales.prelim_score")}</div>
+        </div>
+        <button class="btn btn-ghost" onclick="document.getElementById('detailPanel').classList.add('hidden')">${t("common.close")}</button>
+      </div>
+    </div>
+    <div class="bento" style="margin-bottom:18px">
+      <div class="chart-card span-6" style="margin:0"><h3>${t("dash.chart_breakdown")}</h3><div id="detailRadar" class="plotly-container short"><div class="chart-skel"></div></div></div>
+      <div class="chart-card span-6" style="margin:0"><h3>${t("dash.chart_performance")}</h3><div id="detailGauge" class="plotly-container short"><div class="chart-skel"></div></div></div>
+    </div>
+    <div class="kpi-grid stagger">${kpiHTML}</div>
+  </div>`;
+  panel.scrollIntoView({ behavior: "smooth" });
+
+  setTimeout(() => {
+    Charts.drawRadarChart("detailRadar", {
+      labels: Object.keys(bd).map(k => kpiLabel(k)),
+      values: Object.values(bd).map(v => v.achievement_pct),
+    });
+    Charts.drawGauge("detailGauge", score, { target: 75 });
+  }, 100);
+}
+
+function exportCSV() {
+  const rows = allData;
+  if (!rows.length) return toast(t("dash.no_data"), "error");
+  const header = [t("admin.user"), t("common.month"), t("sales.fresh_leads"),
+                  ...Object.keys(rows[0].breakdown || {}).map(k => t("kpi." + k)),
+                  t("dash.avg_kpi"), t("dash.rating")];
+  const lines = [header.join(",")];
+  rows.forEach(r => {
+    const bd = r.breakdown || {};
+    const row = [r.user_name, r.month, r.fresh_leads,
+      ...Object.values(bd).map(v => v.actual),
+      r.total_score, r.rating];
+    lines.push(row.join(","));
+  });
+  const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `kpi_${rows[0].month}.csv`;
+  a.click();
+}
+
+function onLangChange() {
+  if (_drCtrl) _drCtrl.refreshLabels();
+  render();
+}
+
+// Theme flip — render() already re-runs every chart drawer, so reuse it.
+function onThemeChange() { render(); }
+
+// Allow other pages (e.g. data-entry) to deep-link into a specific rep's detail panel.
+// URL: /dashboard?user=<id>&month=YYYY-MM (legacy) or ?user=<id>&from=&to=
+function _autoOpenFromQuery() {
+  try {
+    const qs = new URLSearchParams(window.location.search);
+    const userId = qs.get("user");
+    if (!userId) return;
+    const id = Number(userId);
+    if (isNaN(id)) return;
+    // Wait until allData is populated. Match by user_id; any month in range works.
+    const tryOpen = () => {
+      const entry = allData.find(r => r.user_id === id);
+      if (entry) showDetail(id, entry.month);
+    };
+    setTimeout(tryOpen, 200);
+  } catch {}
+}
+
+// Mount the date-range picker. onChange fires once on mount → first loadAll
+// runs there, so we don't need to call loadAll() explicitly afterward.
+_drCtrl = DateRange.mount(document.getElementById("dateRangeHost"), {
+  defaultPreset: "last_30",
+  mode: "full",                       // dashboard supports sub-month presets
+  onChange: () => loadAll().then(_autoOpenFromQuery),
+});
+</script>
+{% endblock %}

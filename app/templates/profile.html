@@ -1,0 +1,589 @@
+{% extends "base.html" %}
+{% block title %}Ain KPI · Profile{% endblock %}
+{% block main_class %}narrow{% endblock %}
+
+{% block content %}
+<!-- ── Hero card ──────────────────────────────────────────────────────────
+     Avatar with hover-edit affordance, name + role badge, primary contact.
+     Inline edit-name button keeps quick edits one click away. -->
+<section class="profile-hero">
+  <div class="profile-hero-bg" aria-hidden="true">
+    <span class="profile-hero-blob"></span>
+  </div>
+
+  <div class="profile-hero-body">
+    <div class="profile-avatar-wrap">
+      <div class="profile-avatar" id="profileAvatar">
+        {% if user.avatar_url %}
+          <img id="profileAvatarImg" src="{{ user.avatar_url }}" alt="{{ user.full_name }}">
+        {% else %}
+          <span id="profileAvatarFallback" class="profile-avatar-fallback">{{ user.full_name[0] if user.full_name else 'U' }}</span>
+        {% endif %}
+      </div>
+      <button type="button" class="profile-avatar-btn" id="profileAvatarBtn" data-i18n-aria-label="profile.change_avatar" data-i18n-title="profile.change_avatar">
+        <span class="material-symbols-outlined" aria-hidden="true">photo_camera</span>
+      </button>
+      <button type="button" class="profile-avatar-remove" id="profileAvatarRemove" data-i18n-aria-label="profile.remove_avatar" data-i18n-title="profile.remove_avatar" {% if not user.avatar_url %}hidden{% endif %}>
+        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+      </button>
+      <input type="file" id="profileAvatarInput" accept="image/png,image/jpeg,image/webp" hidden>
+    </div>
+
+    <div class="profile-hero-meta">
+      <h1 class="profile-hero-name" id="profileHeroName">{{ user.full_name }}</h1>
+      <div class="profile-hero-sub">
+        <span class="badge badge-role-{{ user.role }}" id="profileRoleBadge" data-i18n="role.{{ user.role }}">{{ user.role }}</span>
+        <span class="profile-hero-username">@{{ user.username }}</span>
+      </div>
+      <div class="profile-hero-contact" id="profileHeroContact">
+        {% if user.email %}<span><span class="material-symbols-outlined" aria-hidden="true">mail</span>{{ user.email }}</span>{% endif %}
+        {% if user.phone %}<span><span class="material-symbols-outlined" aria-hidden="true">call</span>{{ user.phone }}</span>{% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Quick stats (account snapshot) ─────────────────────────────────── -->
+<section class="profile-stats" id="profileStats">
+  <div class="profile-stat">
+    <div class="profile-stat-icon"><span class="material-symbols-outlined" aria-hidden="true">verified_user</span></div>
+    <div class="profile-stat-body">
+      <div class="profile-stat-label" data-i18n="profile.stat_role"></div>
+      <div class="profile-stat-value" id="statRole" data-i18n="role.{{ user.role }}">{{ user.role }}</div>
+    </div>
+  </div>
+  <div class="profile-stat">
+    <div class="profile-stat-icon"><span class="material-symbols-outlined" aria-hidden="true">event_available</span></div>
+    <div class="profile-stat-body">
+      <div class="profile-stat-label" data-i18n="profile.stat_member_since"></div>
+      <div class="profile-stat-value" id="statSince">—</div>
+    </div>
+  </div>
+  <div class="profile-stat">
+    <div class="profile-stat-icon"><span class="material-symbols-outlined" aria-hidden="true">login</span></div>
+    <div class="profile-stat-body">
+      <div class="profile-stat-label" data-i18n="profile.stat_last_login"></div>
+      <div class="profile-stat-value" id="statLastLogin">—</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Personal info (editable) ───────────────────────────────────────── -->
+<div class="card reveal">
+  <div class="card-title profile-card-title">
+    <span data-i18n="profile.personal_info"></span>
+    <button type="button" class="btn btn-ghost btn-sm" id="editInfoBtn" data-i18n="common.edit"></button>
+  </div>
+
+  <form id="infoForm" novalidate>
+    <div class="field-row">
+      <div class="field">
+        <label for="profFullName" data-i18n="auth.full_name"></label>
+        <input type="text" id="profFullName" maxlength="150" value="{{ user.full_name }}" disabled>
+      </div>
+      <div class="field">
+        <label for="profUsername" data-i18n="auth.username"></label>
+        <input type="text" id="profUsername" value="@{{ user.username }}" disabled readonly>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="profEmail" data-i18n="auth.email"></label>
+        <input type="email" id="profEmail" maxlength="150" value="{{ user.email or '' }}" disabled>
+      </div>
+      <div class="field">
+        <label for="profPhone">
+          <span data-i18n="auth.phone"></span>
+          <small data-i18n="common.optional"></small>
+        </label>
+        <input type="tel" id="profPhone" maxlength="20" value="{{ user.phone or '' }}" disabled>
+      </div>
+    </div>
+
+    <div class="profile-info-actions" id="infoActions" hidden>
+      <button type="submit" class="btn btn-primary" id="infoSaveBtn" data-i18n="common.save"></button>
+      <button type="button" class="btn btn-ghost" id="infoCancelBtn" data-i18n="common.cancel"></button>
+    </div>
+  </form>
+
+  <small class="text-muted profile-contact-hint" data-i18n="profile.contact_admin_hint"></small>
+</div>
+
+<!-- ── Change password ───────────────────────────────────────────────── -->
+<div class="card reveal">
+  <div class="card-title" data-i18n="profile.change_pw"></div>
+  <form id="pwForm" novalidate>
+    <div class="field">
+      <label for="oldPw" data-i18n="profile.old_pw"></label>
+      <div class="pw-input-wrap">
+        <input type="password" id="oldPw" required autocomplete="current-password" maxlength="128">
+        <button type="button" class="pw-toggle" data-target="oldPw" data-i18n-aria-label="common.show_password">
+          <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+        </button>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="newPw" data-i18n="profile.new_pw"></label>
+        <div class="pw-input-wrap">
+          <input type="password" id="newPw" minlength="8" required autocomplete="new-password" maxlength="128">
+          <button type="button" class="pw-toggle" data-target="newPw" data-i18n-aria-label="common.show_password">
+            <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+          </button>
+        </div>
+        <ul class="pw-rules" id="pwRules" aria-live="polite">
+          <li data-rule="length"><span class="material-symbols-outlined" aria-hidden="true">radio_button_unchecked</span><span data-i18n="profile.rule_length"></span></li>
+          <li data-rule="letter"><span class="material-symbols-outlined" aria-hidden="true">radio_button_unchecked</span><span data-i18n="profile.rule_letter"></span></li>
+          <li data-rule="digit"><span class="material-symbols-outlined" aria-hidden="true">radio_button_unchecked</span><span data-i18n="profile.rule_digit"></span></li>
+        </ul>
+      </div>
+      <div class="field">
+        <label for="confirmPw" data-i18n="profile.confirm_pw"></label>
+        <div class="pw-input-wrap">
+          <input type="password" id="confirmPw" minlength="8" required autocomplete="new-password" maxlength="128">
+          <button type="button" class="pw-toggle" data-target="confirmPw" data-i18n-aria-label="common.show_password">
+            <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary" id="pwBtn" data-i18n="profile.change_btn"></button>
+  </form>
+</div>
+
+<!-- Avatar crop modal — pan + zoom + circular preview, finally extracts a
+     square JPEG via canvas before posting. -->
+<div class="modal-backdrop" id="avatarCropModal" role="dialog" aria-modal="true" aria-labelledby="avatarCropTitle">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title" id="avatarCropTitle" data-i18n="profile.crop_title"></div>
+      <button class="modal-close" onclick="closeModal('avatarCropModal')" data-i18n-aria-label="common.close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="avatar-crop-stage" id="avatarCropStage" aria-label="Crop stage">
+        <img id="avatarCropImg" alt="" draggable="false">
+        <span class="avatar-crop-frame" aria-hidden="true"></span>
+      </div>
+      <div class="avatar-crop-controls">
+        <button type="button" class="avatar-crop-icon-btn" id="avatarZoomOutBtn" data-i18n-aria-label="profile.crop_zoom_out">
+          <span class="material-symbols-outlined" aria-hidden="true">remove</span>
+        </button>
+        <input type="range" id="avatarZoom" min="1" max="3" step="0.01" value="1" aria-label="Zoom">
+        <button type="button" class="avatar-crop-icon-btn" id="avatarZoomInBtn" data-i18n-aria-label="profile.crop_zoom_in">
+          <span class="material-symbols-outlined" aria-hidden="true">add</span>
+        </button>
+      </div>
+      <p class="avatar-crop-hint" data-i18n="profile.crop_hint"></p>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-primary" id="avatarCropSaveBtn" data-i18n="common.save"></button>
+      <button type="button" class="btn btn-ghost" onclick="closeModal('avatarCropModal')" data-i18n="common.cancel"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Avatar remove confirm modal -->
+<div class="modal-backdrop" id="avatarRemoveModal" role="dialog" aria-modal="true" aria-labelledby="avatarRemoveTitle">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title" id="avatarRemoveTitle" data-i18n="profile.remove_avatar_title"></div>
+      <button class="modal-close" onclick="closeModal('avatarRemoveModal')" data-i18n-aria-label="common.close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p data-i18n="profile.remove_avatar_body"></p>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('avatarRemoveModal')" data-default-focus data-i18n="common.cancel"></button>
+      <button type="button" class="btn btn-danger" id="avatarRemoveConfirmBtn" data-i18n="profile.remove_avatar_btn"></button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const USER_ID = {{ user.id|tojson }};
+const CURRENT_ROLE = {{ user.role|tojson }};
+
+// ─── Populate stats (created_at + last_login) ────────────────────────
+async function loadStats() {
+  try {
+    // /api/users/<id> requires admin/manager. Self-service users don't have it,
+    // so we surface only what /api/auth/me already gave us. Keeping the call
+    // gated keeps the fallback graceful.
+    const me = await api("/api/auth/me");
+    if (me && me.created_at) document.getElementById("statSince").textContent = fmtDate(me.created_at);
+    if (me && me.last_login) document.getElementById("statLastLogin").textContent = fmtDate(me.last_login);
+  } catch (_) {}
+}
+
+function fmtDate(iso) {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    const lang = (typeof getLang === "function" ? getLang() : "ar") === "ar" ? "ar-EG" : "en-GB";
+    return d.toLocaleDateString(lang, { year: "numeric", month: "short", day: "numeric" });
+  } catch (_) { return iso; }
+}
+
+// ─── Avatar pipeline: pick → crop → upload ──────────────────────────
+// Final avatar stored at AVATAR_TARGET × AVATAR_TARGET, JPEG @ ~0.85
+// quality, gives us 30–80 KB payloads — well under the 200 KB server cap.
+const AVATAR_TARGET = 256;
+const AVATAR_QUALITY = 0.85;
+// Stage (preview area) size in CSS pixels. Has to match the .avatar-crop-stage
+// rule below — we use it both for layout maths and the final canvas crop.
+const CROP_STAGE = 280;
+
+let cropState = {
+  naturalW: 0,
+  naturalH: 0,
+  baseScale: 1,    // scale needed to "cover" the stage at zoom=1
+  scale: 1,        // user zoom (1..3)
+  tx: 0,           // user pan
+  ty: 0,
+};
+
+function _readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onerror = () => reject(new Error("read_failed"));
+    r.onload = () => resolve(r.result);
+    r.readAsDataURL(file);
+  });
+}
+
+function _loadImageFromDataURL(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onerror = () => reject(new Error("image_decode_failed"));
+    img.onload = () => resolve(img);
+    img.src = dataUrl;
+  });
+}
+
+async function openCropper(file) {
+  if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) {
+    return toast(t("errors.avatar_unsupported_type"), "error");
+  }
+  if (file.size > 12 * 1024 * 1024) {
+    // Source bound: refuse very large files before we try to decode them.
+    return toast(t("errors.avatar_too_large"), "error");
+  }
+
+  let dataUrl, img;
+  try {
+    dataUrl = await _readFileAsDataURL(file);
+    img = await _loadImageFromDataURL(dataUrl);
+  } catch (_) {
+    return toast(t("errors.avatar_invalid"), "error");
+  }
+
+  cropState.naturalW = img.naturalWidth;
+  cropState.naturalH = img.naturalHeight;
+  cropState.baseScale = Math.max(CROP_STAGE / img.naturalWidth, CROP_STAGE / img.naturalHeight);
+  cropState.scale = 1;
+  cropState.tx = 0;
+  cropState.ty = 0;
+
+  const cropImg = document.getElementById("avatarCropImg");
+  cropImg.src = dataUrl;
+  cropImg.width = img.naturalWidth;
+  cropImg.height = img.naturalHeight;
+  applyCropTransform();
+  document.getElementById("avatarZoom").value = "1";
+
+  openModal("avatarCropModal");
+}
+
+function applyCropTransform() {
+  const totalScale = cropState.baseScale * cropState.scale;
+  const dispW = cropState.naturalW * totalScale;
+  const dispH = cropState.naturalH * totalScale;
+  // Center the (scaled) image inside the stage, then offset by the user pan.
+  const offsetX = (CROP_STAGE - dispW) / 2 + cropState.tx;
+  const offsetY = (CROP_STAGE - dispH) / 2 + cropState.ty;
+  const img = document.getElementById("avatarCropImg");
+  img.style.transformOrigin = "0 0";
+  img.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${totalScale})`;
+}
+
+// Clamp the pan so the image always covers the stage (no empty corners).
+function clampPan() {
+  const totalScale = cropState.baseScale * cropState.scale;
+  const dispW = cropState.naturalW * totalScale;
+  const dispH = cropState.naturalH * totalScale;
+  const overflowX = Math.max(0, (dispW - CROP_STAGE) / 2);
+  const overflowY = Math.max(0, (dispH - CROP_STAGE) / 2);
+  cropState.tx = Math.max(-overflowX, Math.min(overflowX, cropState.tx));
+  cropState.ty = Math.max(-overflowY, Math.min(overflowY, cropState.ty));
+}
+
+// Pan via pointer events (mouse + touch; pointer capture keeps the stage
+// "sticky" if the cursor leaves it mid-drag).
+let _dragState = null;
+const cropStage = document.getElementById("avatarCropStage");
+cropStage.addEventListener("pointerdown", (e) => {
+  cropStage.setPointerCapture(e.pointerId);
+  cropStage.classList.add("is-dragging");
+  _dragState = {
+    pid: e.pointerId,
+    startX: e.clientX, startY: e.clientY,
+    baseTx: cropState.tx, baseTy: cropState.ty,
+  };
+});
+cropStage.addEventListener("pointermove", (e) => {
+  if (!_dragState || _dragState.pid !== e.pointerId) return;
+  cropState.tx = _dragState.baseTx + (e.clientX - _dragState.startX);
+  cropState.ty = _dragState.baseTy + (e.clientY - _dragState.startY);
+  clampPan();
+  applyCropTransform();
+});
+const _endDrag = (e) => {
+  if (!_dragState || _dragState.pid !== e.pointerId) return;
+  cropStage.classList.remove("is-dragging");
+  _dragState = null;
+};
+cropStage.addEventListener("pointerup", _endDrag);
+cropStage.addEventListener("pointercancel", _endDrag);
+
+// Zoom slider + plus/minus buttons
+function _setZoom(z) {
+  cropState.scale = Math.max(1, Math.min(3, z));
+  document.getElementById("avatarZoom").value = String(cropState.scale);
+  clampPan();
+  applyCropTransform();
+}
+document.getElementById("avatarZoom").addEventListener("input", (e) => {
+  _setZoom(Number(e.target.value));
+});
+document.getElementById("avatarZoomInBtn").addEventListener("click", () => _setZoom(cropState.scale + 0.2));
+document.getElementById("avatarZoomOutBtn").addEventListener("click", () => _setZoom(cropState.scale - 0.2));
+
+// Wheel zoom on the stage, like Figma / Zoom-to-cursor lite.
+cropStage.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  _setZoom(cropState.scale + (e.deltaY < 0 ? 0.08 : -0.08));
+}, { passive: false });
+
+// On Save: extract the visible source region into a 256×256 canvas.
+document.getElementById("avatarCropSaveBtn").addEventListener("click", async () => {
+  const img = document.getElementById("avatarCropImg");
+  if (!cropState.naturalW || !cropState.naturalH) return;
+
+  const totalScale = cropState.baseScale * cropState.scale;
+  const dispW = cropState.naturalW * totalScale;
+  const dispH = cropState.naturalH * totalScale;
+  const offsetX = (CROP_STAGE - dispW) / 2 + cropState.tx;
+  const offsetY = (CROP_STAGE - dispH) / 2 + cropState.ty;
+
+  // Stage coords (0..CROP_STAGE) → source-image coords:
+  //   srcPx = (stagePx - offset) / totalScale
+  const sx = -offsetX / totalScale;
+  const sy = -offsetY / totalScale;
+  const sWidth = CROP_STAGE / totalScale;
+  const sHeight = CROP_STAGE / totalScale;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = AVATAR_TARGET;
+  canvas.height = AVATAR_TARGET;
+  const ctx = canvas.getContext("2d");
+  // White underlay so JPEG encoding of transparent PNGs doesn't render
+  // weird dark fringes on the avatar's circular display.
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, AVATAR_TARGET, AVATAR_TARGET);
+  ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, AVATAR_TARGET, AVATAR_TARGET);
+
+  const dataUrl = canvas.toDataURL("image/jpeg", AVATAR_QUALITY);
+  closeModal("avatarCropModal");
+  await uploadAvatarDataURL(dataUrl);
+});
+
+async function uploadAvatarDataURL(dataUrl) {
+  // Defensive size check before posting (server caps at 200KB after b64
+  // decode; ~272KB raw data URL ≈ 200KB binary).
+  if (dataUrl.length > 280 * 1024) {
+    return toast(t("errors.avatar_too_large"), "error");
+  }
+  const prev = _setAvatarPreview(dataUrl);
+  try {
+    await api("/api/auth/avatar", { method: "POST", body: { avatar_url: dataUrl } });
+    toast(t("profile.avatar_updated"), "success");
+    _broadcastAvatar(dataUrl);
+    document.getElementById("profileAvatarRemove").hidden = false;
+  } catch (e) {
+    _restoreAvatarPreview(prev);
+    toastError(e);
+  }
+}
+
+function _setAvatarPreview(dataUrl) {
+  const wrap = document.getElementById("profileAvatar");
+  const prevHTML = wrap.innerHTML;
+  wrap.innerHTML = `<img id="profileAvatarImg" src="${escapeAttr(dataUrl)}" alt="">`;
+  return prevHTML;
+}
+
+function _restoreAvatarPreview(prevHTML) {
+  document.getElementById("profileAvatar").innerHTML = prevHTML;
+}
+
+function escapeAttr(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
+    {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]
+  ));
+}
+
+// Update every avatar-bearing surface on the same page (topnav avatar).
+function _broadcastAvatar(dataUrl) {
+  document.querySelectorAll(".topnav-user .avatar").forEach(a => {
+    a.classList.add("avatar-img");
+    a.innerHTML = `<img src="${escapeAttr(dataUrl)}" alt="">`;
+  });
+}
+
+function _broadcastAvatarRemoved(initial) {
+  document.querySelectorAll(".topnav-user .avatar").forEach(a => {
+    a.classList.remove("avatar-img");
+    a.textContent = initial || "U";
+  });
+}
+
+document.getElementById("profileAvatarBtn").addEventListener("click", () => {
+  document.getElementById("profileAvatarInput").click();
+});
+document.getElementById("profileAvatarInput").addEventListener("change", (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (file) openCropper(file);
+  e.target.value = "";  // allow reselecting the same file
+});
+
+// ─── Avatar remove ──────────────────────────────────────────────────
+document.getElementById("profileAvatarRemove").addEventListener("click", () => {
+  openModal("avatarRemoveModal");
+});
+document.getElementById("avatarRemoveConfirmBtn").addEventListener("click", async () => {
+  const initial = (document.getElementById("profileHeroName").textContent || "U").trim()[0] || "U";
+  try {
+    await api("/api/auth/avatar", { method: "DELETE" });
+    document.getElementById("profileAvatar").innerHTML =
+      `<span id="profileAvatarFallback" class="profile-avatar-fallback">${escapeAttr(initial)}</span>`;
+    document.getElementById("profileAvatarRemove").hidden = true;
+    _broadcastAvatarRemoved(initial);
+    closeModal("avatarRemoveModal");
+    toast(t("profile.avatar_removed"), "success");
+  } catch (e) { toastError(e); }
+});
+
+// ─── Personal info edit ─────────────────────────────────────────────
+const infoFields = ["profFullName", "profEmail", "profPhone"];
+let _infoSnapshot = null;
+
+document.getElementById("editInfoBtn").addEventListener("click", () => {
+  _infoSnapshot = Object.fromEntries(infoFields.map(id => [id, document.getElementById(id).value]));
+  infoFields.forEach(id => { document.getElementById(id).disabled = false; });
+  document.getElementById("editInfoBtn").hidden = true;
+  document.getElementById("infoActions").hidden = false;
+  document.getElementById("profFullName").focus();
+});
+
+document.getElementById("infoCancelBtn").addEventListener("click", () => {
+  if (_infoSnapshot) {
+    infoFields.forEach(id => { document.getElementById(id).value = _infoSnapshot[id] || ""; });
+  }
+  _exitInfoEdit();
+});
+
+function _exitInfoEdit() {
+  infoFields.forEach(id => { document.getElementById(id).disabled = true; });
+  document.getElementById("editInfoBtn").hidden = false;
+  document.getElementById("infoActions").hidden = true;
+}
+
+document.getElementById("infoForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const body = {
+    full_name: document.getElementById("profFullName").value.trim(),
+    email: document.getElementById("profEmail").value.trim().toLowerCase(),
+    phone: document.getElementById("profPhone").value.trim(),
+  };
+  if (!body.full_name) return toast(t("errors.required_fields_missing"), "error");
+
+  const btn = document.getElementById("infoSaveBtn");
+  btn.disabled = true;
+  try {
+    const r = await api("/api/auth/profile", { method: "PATCH", body });
+    const u = (r && r.user) || {};
+    document.getElementById("profileHeroName").textContent = u.full_name || body.full_name;
+    _renderHeroContact(u.email || body.email, u.phone || body.phone);
+    _exitInfoEdit();
+    toast(t("common.saved"), "success");
+  } catch (err) {
+    toastError(err);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+function _renderHeroContact(email, phone) {
+  const host = document.getElementById("profileHeroContact");
+  const parts = [];
+  if (email) parts.push(`<span><span class="material-symbols-outlined" aria-hidden="true">mail</span>${escapeAttr(email)}</span>`);
+  if (phone) parts.push(`<span><span class="material-symbols-outlined" aria-hidden="true">call</span>${escapeAttr(phone)}</span>`);
+  host.innerHTML = parts.join("");
+}
+
+// ─── Change password (existing flow) ────────────────────────────────
+function checkPwRules() {
+  const v = document.getElementById("newPw").value;
+  const rules = {
+    length: v.length >= 8,
+    letter: /[A-Za-z]/.test(v),
+    digit:  /\d/.test(v),
+  };
+  document.querySelectorAll("#pwRules li").forEach(li => {
+    const r = li.getAttribute("data-rule");
+    const passed = rules[r];
+    li.classList.toggle("passed", passed);
+    const icon = li.querySelector(".material-symbols-outlined");
+    if (icon) icon.textContent = passed ? "check_circle" : "radio_button_unchecked";
+  });
+  return rules.length && rules.letter && rules.digit;
+}
+
+document.getElementById("newPw").addEventListener("input", checkPwRules);
+
+document.getElementById("pwForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const oldPw = document.getElementById("oldPw").value;
+  const newPw = document.getElementById("newPw").value;
+  const confirmPw = document.getElementById("confirmPw").value;
+
+  if (newPw !== confirmPw) return toast(t("profile.pw_mismatch"), "error");
+  if (!checkPwRules()) return toast(t("errors.weak_password"), "error");
+  if (newPw === oldPw) return toast(t("profile.pw_same_as_old"), "error");
+
+  const btn = document.getElementById("pwBtn");
+  btn.disabled = true;
+  try {
+    await api("/api/auth/change-password", { method: "POST", body: { old_password: oldPw, new_password: newPw } });
+    toast(t("profile.pw_changed"), "success");
+    document.getElementById("pwForm").reset();
+    checkPwRules();
+  } catch (err) { toastError(err); }
+  finally { btn.disabled = false; }
+});
+
+function onLangChange() {
+  const roleEl = document.getElementById("statRole");
+  if (roleEl) roleEl.textContent = t("role.{{ user.role }}");
+  // Re-format dates in the active locale.
+  loadStats();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadStats();
+  onLangChange();
+});
+</script>
+{% endblock %}

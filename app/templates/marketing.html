@@ -1,0 +1,1152 @@
+{% extends "base.html" %}
+{% block title %}Ain KPI{% endblock %}
+
+{% block head %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title" data-i18n="mk.title"></h1>
+    <p class="page-subtitle" data-i18n="mk.subtitle"></p>
+  </div>
+  <button class="btn btn-primary" onclick="openNew()" data-i18n="mk.new_campaign"></button>
+</div>
+
+<!-- Campaign selector + actions -->
+<div class="controls" style="margin-bottom:20px">
+  <div class="field" style="min-width:280px">
+    <label data-i18n="mk.campaign"></label>
+    <select id="campSelect" onchange="selectCampaign()"></select>
+  </div>
+  <div id="campActions" class="hidden" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+    <button class="btn btn-sm" onclick="editCurrent()" data-i18n="common.edit"></button>
+    <button class="btn btn-sm btn-danger" onclick="deleteCurrent()" data-i18n="common.delete"></button>
+  </div>
+</div>
+
+<!-- Empty state -->
+<div id="emptyState" class="empty-state">
+  <div class="empty-state-icon"><span class="material-symbols-outlined" aria-hidden="true">analytics</span></div>
+  <div data-i18n="mk.empty_state"></div>
+</div>
+
+<!-- Dashboard — 12 sections, rendered from /api/marketing/campaigns/:id/dashboard -->
+<div id="dashboard" class="hidden">
+
+  <!-- 1) Campaign Overview -->
+  <section class="mkt-section reveal">
+    <h2 class="mkt-section-title">
+      <span class="mkt-section-num">1</span>
+      <span data-i18n="mk.section_overview"></span>
+    </h2>
+    <div class="mkt-overview-grid" id="ovOverview"></div>
+  </section>
+
+  <!-- 2) Scenario Planning -->
+  <section class="mkt-section reveal">
+    <h2 class="mkt-section-title">
+      <span class="mkt-section-num">2</span>
+      <span data-i18n="mk.section_scenarios"></span>
+    </h2>
+    <div class="mkt-scenarios-row" id="ovScenarios"></div>
+    <div class="mkt-recommended" id="ovRecommended"></div>
+  </section>
+
+  <!-- 3) Master Funnel Targets -->
+  <section class="mkt-section reveal">
+    <h2 class="mkt-section-title">
+      <span class="mkt-section-num">3</span>
+      <span data-i18n="mk.section_master_funnel"></span>
+    </h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th data-i18n="mk.kpi"></th>
+          <th data-i18n="mk.target_value"></th>
+          <th data-i18n="mk.unit"></th>
+        </tr></thead>
+        <tbody id="ovMaster"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 4) Dynamic by Spend -->
+  <section class="mkt-section reveal">
+    <h2 class="mkt-section-title">
+      <span class="mkt-section-num">4</span>
+      <span data-i18n="mk.section_dynamic_spend"></span>
+    </h2>
+    <div id="ovDynamicHeadline" class="mkt-headline-row"></div>
+
+    <!-- Inline actuals entry card — always open so marketing users can edit existing values without hunting for a toggle. -->
+    <div id="actualsInlineCard" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;margin-top:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span id="actualsInlineTitle" style="font-weight:600;font-size:15px;color:var(--text)"></span>
+        <span id="actualsSavedHint" style="font-size:12px;color:var(--text-muted);display:none">
+          <span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px;vertical-align:-2px">check_circle</span>
+          <span data-i18n="mk.actuals_saved"></span>
+        </span>
+      </div>
+      <div id="actualsInlineBody">
+        <p id="actualsInlineHint" style="font-size:13px;color:var(--text-muted);margin-bottom:14px"></p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+          <div class="field">
+            <label data-i18n="mk.actual_spend"></label>
+            <input type="number" min="0" id="a_spend" class="form-input" placeholder="0">
+          </div>
+          <div class="field">
+            <label data-i18n="mk.actual_leads"></label>
+            <input type="number" min="0" id="a_leads" class="form-input" placeholder="0">
+          </div>
+          <div class="field">
+            <label data-i18n="mk.actual_ql"></label>
+            <input type="number" min="0" id="a_ql" class="form-input" placeholder="0">
+          </div>
+          <div class="field">
+            <label data-i18n="mk.actual_meetings"></label>
+            <input type="number" min="0" id="a_meet" class="form-input" placeholder="0">
+          </div>
+          <div class="field">
+            <label data-i18n="mk.actual_fu"></label>
+            <input type="number" min="0" id="a_fu" class="form-input" placeholder="0">
+          </div>
+          <div class="field">
+            <label data-i18n="mk.actual_deals"></label>
+            <input type="number" min="0" id="a_deals" class="form-input" placeholder="0">
+          </div>
+        </div>
+        <div style="margin-top:14px">
+          <button class="btn btn-primary" onclick="saveActuals()" data-i18n="mk.save_actuals"></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section-title" data-i18n="mk.volume_kpis" style="margin-top:14px"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th data-i18n="mk.kpi"></th>
+          <th data-i18n="mk.col_full_target"></th>
+          <th data-i18n="mk.col_progress"></th>
+          <th data-i18n="mk.col_dynamic_target"></th>
+          <th data-i18n="mk.col_actual"></th>
+          <th data-i18n="mk.col_achievement"></th>
+          <th data-i18n="mk.col_status"></th>
+        </tr></thead>
+        <tbody id="ovDynamicVolume"></tbody>
+      </table>
+    </div>
+
+    <div class="form-section-title" data-i18n="mk.efficiency_kpis" style="margin-top:14px"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th data-i18n="mk.kpi"></th>
+          <th data-i18n="mk.col_target"></th>
+          <th data-i18n="mk.col_actual"></th>
+          <th data-i18n="mk.col_status"></th>
+        </tr></thead>
+        <tbody id="ovDynamicEfficiency"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 5) Time Pacing -->
+  <section class="mkt-section reveal" id="sectionTimePacing">
+    <h2 class="mkt-section-title">
+      <span class="mkt-section-num">5</span>
+      <span data-i18n="mk.section_time_pacing"></span>
+    </h2>
+    <div id="ovTimeHeadline" class="mkt-headline-row"></div>
+    <div class="table-wrap" id="ovTimeTableWrap">
+      <table>
+        <thead><tr>
+          <th data-i18n="mk.kpi"></th>
+          <th data-i18n="mk.col_full_target"></th>
+          <th data-i18n="mk.col_time_progress"></th>
+          <th data-i18n="mk.col_time_target"></th>
+          <th data-i18n="mk.col_actual"></th>
+          <th data-i18n="mk.col_achievement"></th>
+          <th data-i18n="mk.col_status"></th>
+        </tr></thead>
+        <tbody id="ovTimeRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 6) Actual vs Target Summary -->
+  <section class="mkt-section reveal">
+    <h2 class="mkt-section-title">
+      <span class="mkt-section-num">6</span>
+      <span data-i18n="mk.section_actual_target"></span>
+    </h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th data-i18n="mk.kpi"></th>
+          <th data-i18n="mk.col_full_target"></th>
+          <th data-i18n="mk.col_dynamic_target"></th>
+          <th data-i18n="mk.col_time_target"></th>
+          <th data-i18n="mk.col_actual"></th>
+          <th data-i18n="mk.col_status"></th>
+        </tr></thead>
+        <tbody id="ovSummary"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 7) Period Performance -->
+  <section class="mkt-section reveal">
+    <h2 class="mkt-section-title">
+      <span class="mkt-section-num">7</span>
+      <span data-i18n="mk.section_period_perf"></span>
+      <button class="btn btn-sm btn-primary mkt-section-cta" onclick="openPeriodForm()">
+        <span class="material-symbols-outlined" aria-hidden="true">add</span>
+        <span data-i18n="mk.add_period"></span>
+      </button>
+    </h2>
+    <div class="tab-bar" role="tablist" aria-label="Period kinds">
+      <button class="tab-btn active" id="ptab-5_day" role="tab" aria-selected="true" tabindex="0" onclick="switchPeriodTab('5_day',this)" data-i18n="mk.period_5_day"></button>
+      <button class="tab-btn" id="ptab-daily" role="tab" aria-selected="false" tabindex="-1" onclick="switchPeriodTab('daily',this)" data-i18n="mk.period_daily"></button>
+      <button class="tab-btn" id="ptab-weekly" role="tab" aria-selected="false" tabindex="-1" onclick="switchPeriodTab('weekly',this)" data-i18n="mk.period_weekly"></button>
+      <button class="tab-btn" id="ptab-monthly" role="tab" aria-selected="false" tabindex="-1" onclick="switchPeriodTab('monthly',this)" data-i18n="mk.period_monthly"></button>
+    </div>
+    <div id="ovPeriodTable"></div>
+  </section>
+
+  <!-- 8) 5-Day Health Check -->
+  <section class="mkt-section reveal" id="sectionHealth">
+    <h2 class="mkt-section-title">
+      <span class="mkt-section-num">8</span>
+      <span data-i18n="mk.section_health_check"></span>
+    </h2>
+    <div id="ovHealthSummary" class="mkt-headline-row"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th data-i18n="mk.health_period"></th>
+          <th data-i18n="mk.kpi_cpl"></th>
+          <th data-i18n="mk.kpi_cost_per_deal"></th>
+          <th data-i18n="mk.kpi_close_rate"></th>
+          <th data-i18n="mk.health_verdict"></th>
+        </tr></thead>
+        <tbody id="ovHealthRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 9) Insights -->
+  <section class="mkt-section reveal">
+    <h2 class="mkt-section-title">
+      <span class="mkt-section-num">9</span>
+      <span data-i18n="mk.section_insights"></span>
+    </h2>
+    <ul class="mkt-insights" id="ovInsights"></ul>
+  </section>
+
+  <!-- 10) Action Plan -->
+  <section class="mkt-section reveal">
+    <h2 class="mkt-section-title">
+      <span class="mkt-section-num">10</span>
+      <span data-i18n="mk.section_action_plan"></span>
+    </h2>
+    <div class="mkt-actions-grid" id="ovActions"></div>
+  </section>
+
+  <!-- 11) KPI Entry Templates -->
+  <details class="mkt-section mkt-collapsible reveal">
+    <summary class="mkt-section-title">
+      <span class="mkt-section-num">11</span>
+      <span data-i18n="mk.section_templates"></span>
+      <span class="material-symbols-outlined mkt-chev" aria-hidden="true">expand_more</span>
+    </summary>
+    <div id="ovTemplates"></div>
+  </details>
+
+  <!-- 12) Formulas -->
+  <details class="mkt-section mkt-collapsible reveal">
+    <summary class="mkt-section-title">
+      <span class="mkt-section-num">12</span>
+      <span data-i18n="mk.section_formulas"></span>
+      <span class="material-symbols-outlined mkt-chev" aria-hidden="true">expand_more</span>
+    </summary>
+    <div id="ovFormulas"></div>
+  </details>
+</div>
+
+
+<!-- Campaign create/edit modal -->
+<div class="modal-backdrop" id="campModal" role="dialog" aria-modal="true" aria-labelledby="campModalTitle">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <div class="modal-title" id="campModalTitle"></div>
+      <button class="modal-close" onclick="closeModal('campModal')" data-i18n-aria-label="common.close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-row">
+        <div class="field">
+          <label for="f_name" data-i18n="mk.field_name"></label>
+          <input type="text" id="f_name" maxlength="200">
+        </div>
+        <div class="field">
+          <label for="f_price" data-i18n="mk.field_price"></label>
+          <input type="number" min="0" id="f_price">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="f_budget" data-i18n="mk.field_budget"></label>
+          <input type="number" min="0" id="f_budget">
+        </div>
+        <div class="field">
+          <label for="f_comm" data-i18n="mk.field_comm"></label>
+          <input type="number" min="0" step="0.01" id="f_comm">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="f_ctype" data-i18n="mk.field_ctype"></label>
+          <select id="f_ctype">
+            <option value="percentage" data-i18n="mk.ctype_pct"></option>
+            <option value="fixed" data-i18n="mk.ctype_fixed"></option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f_cr" data-i18n="mk.field_cr"></label>
+          <input type="number" min="0" max="100" step="0.1" id="f_cr">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="f_tax" data-i18n="mk.field_tax"></label>
+          <input type="number" min="0" max="100" id="f_tax" value="19">
+        </div>
+        <div class="field">
+          <label for="f_review_date" data-i18n="mk.field_review_date"></label>
+          <input type="date" id="f_review_date">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="f_start_date" data-i18n="mk.field_start_date"></label>
+          <input type="date" id="f_start_date">
+        </div>
+        <div class="field">
+          <label for="f_end_date" data-i18n="mk.field_end_date"></label>
+          <input type="date" id="f_end_date">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="saveCampaign()" data-i18n="mk.save_campaign"></button>
+      <button class="btn btn-ghost" onclick="closeModal('campModal')" data-i18n="common.cancel"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete-confirm modal -->
+<div class="modal-backdrop" id="campDeleteModal" role="dialog" aria-modal="true" aria-labelledby="campDeleteTitle">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div class="modal-title" id="campDeleteTitle" data-i18n="mk.confirm_delete_title"></div>
+      <button class="modal-close" onclick="closeModal('campDeleteModal')" data-i18n-aria-label="common.close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p data-i18n="mk.confirm_delete_body"></p>
+      <p style="margin-top:10px;font-weight:600" id="campDeleteName"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" onclick="confirmDelete()" data-i18n="common.delete"></button>
+      <button class="btn btn-ghost" onclick="closeModal('campDeleteModal')" data-i18n="common.cancel"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Period entry modal -->
+<div class="modal-backdrop" id="periodModal" role="dialog" aria-modal="true" aria-labelledby="periodModalTitle">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <div class="modal-title" id="periodModalTitle" data-i18n="mk.add_period"></div>
+      <button class="modal-close" onclick="closeModal('periodModal')" data-i18n-aria-label="common.close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-row">
+        <div class="field">
+          <label for="pf_kind" data-i18n="mk.period_kind"></label>
+          <select id="pf_kind">
+            <option value="5_day" data-i18n="mk.period_5_day"></option>
+            <option value="daily" data-i18n="mk.period_daily"></option>
+            <option value="weekly" data-i18n="mk.period_weekly"></option>
+            <option value="monthly" data-i18n="mk.period_monthly"></option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="pf_index" data-i18n="mk.period_index"></label>
+          <input type="number" min="1" id="pf_index">
+        </div>
+      </div>
+      <div class="field">
+        <label for="pf_label" data-i18n="mk.period_label"></label>
+        <input type="text" id="pf_label" maxlength="60">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="pf_start" data-i18n="mk.period_start"></label>
+          <input type="date" id="pf_start">
+        </div>
+        <div class="field">
+          <label for="pf_end" data-i18n="mk.period_end"></label>
+          <input type="date" id="pf_end">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="pf_spend" data-i18n="mk.actual_spend"></label>
+          <input type="number" min="0" id="pf_spend">
+        </div>
+        <div class="field">
+          <label for="pf_leads" data-i18n="mk.actual_leads"></label>
+          <input type="number" min="0" id="pf_leads">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="pf_qleads" data-i18n="mk.actual_ql"></label>
+          <input type="number" min="0" id="pf_qleads">
+        </div>
+        <div class="field">
+          <label for="pf_meetings" data-i18n="mk.actual_meetings"></label>
+          <input type="number" min="0" id="pf_meetings">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="pf_fup" data-i18n="mk.actual_fu"></label>
+          <input type="number" min="0" id="pf_fup">
+        </div>
+        <div class="field">
+          <label for="pf_deals" data-i18n="mk.actual_deals"></label>
+          <input type="number" min="0" id="pf_deals">
+        </div>
+      </div>
+      <div class="field">
+        <label for="pf_notes" data-i18n="mk.period_notes"></label>
+        <textarea id="pf_notes" rows="2" style="width:100%"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="savePeriod()" data-i18n="mk.save_period"></button>
+      <button class="btn btn-ghost" onclick="closeModal('periodModal')" data-i18n="common.cancel"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Period delete confirm -->
+<div class="modal-backdrop" id="periodDeleteModal" role="dialog" aria-modal="true" aria-labelledby="periodDeleteTitle">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div class="modal-title" id="periodDeleteTitle" data-i18n="mk.confirm_delete_title"></div>
+      <button class="modal-close" onclick="closeModal('periodDeleteModal')" data-i18n-aria-label="common.close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p data-i18n="mk.confirm_delete_period"></p>
+      <p style="margin-top:10px;font-weight:600" id="periodDeleteLabel"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" onclick="confirmPeriodDelete()" data-i18n="common.delete"></button>
+      <button class="btn btn-ghost" onclick="closeModal('periodDeleteModal')" data-i18n="common.cancel"></button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}?v=flat51"></script>
+<script>
+let campaigns = [];
+let currentCamp = null;          // selected campaign row
+let dashboard = null;             // computed payload from /dashboard endpoint
+let editingCampId = null;
+let activePeriodKind = "5_day";
+let editingPeriod = null;         // {kind, index} or null for new
+let pendingPeriodDelete = null;
+
+// ─── Formatters (locale-aware) ──────────────────────────────────────────
+const _locale = () => getLang() === "ar" ? "ar-EG" : "en-US";
+const fmt0 = n => n == null ? "—" : Number(n).toLocaleString(_locale(), { maximumFractionDigits: 0 });
+const fmt2 = n => n == null ? "—" : Number(n).toLocaleString(_locale(), { maximumFractionDigits: 2 });
+const fmtPct = n => n == null ? "—" : (Number(n) * 100).toFixed(1) + "%";
+const egp = n => fmt2(n) + " " + t("mk.unit_egp");
+
+function escapeHTML(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
+    {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]
+  ));
+}
+
+// ─── Status pill (reuses .badge-* tokens) ───────────────────────────────
+const STATUS_BADGE = {
+  on_track: { cls: "badge-excellent", icon: "check_circle", key: "mk.status_on" },
+  warning:  { cls: "badge-pending",   icon: "warning",      key: "mk.status_warn" },
+  critical: { cls: "badge-bad",       icon: "error",        key: "mk.status_crit" },
+  n_a:      { cls: "badge-pending",   icon: "remove",       key: "mk.status_na" },
+};
+function statusBadge(code) {
+  const m = STATUS_BADGE[code] || STATUS_BADGE.n_a;
+  return `<span class="badge ${m.cls}" style="display:inline-flex;align-items:center;gap:4px">
+    <span class="material-symbols-outlined" aria-hidden="true" style="font-size:14px">${m.icon}</span>
+    <span>${t(m.key)}</span>
+  </span>`;
+}
+const VERDICT_BADGE = {
+  excellent: { cls: "badge-excellent", key: "mk.verdict_excellent" },
+  good:      { cls: "badge-vgood",     key: "mk.verdict_good" },
+  watch:     { cls: "badge-pending",   key: "mk.verdict_watch" },
+  critical:  { cls: "badge-bad",       key: "mk.verdict_critical" },
+};
+function verdictBadge(v) {
+  const m = VERDICT_BADGE[v] || VERDICT_BADGE.good;
+  return `<span class="badge ${m.cls}">${t(m.key)}</span>`;
+}
+
+// ─── Campaign loading + selection ───────────────────────────────────────
+async function loadCampaigns() {
+  try {
+    campaigns = await api("/api/marketing/campaigns");
+    populateSelect();
+    if (campaigns.length) {
+      const prevId = currentCamp ? currentCamp.id : null;
+      const pick = campaigns.find(c => c.id === prevId) || campaigns[0];
+      document.getElementById("campSelect").value = pick.id;
+      await selectCampaign();
+    } else {
+      currentCamp = null;
+      dashboard = null;
+      document.getElementById("emptyState").classList.remove("hidden");
+      document.getElementById("dashboard").classList.add("hidden");
+      document.getElementById("campActions").classList.add("hidden");
+    }
+  } catch (e) { toastError(e); }
+}
+
+function populateSelect() {
+  const sel = document.getElementById("campSelect");
+  const prev = sel.value;
+  sel.innerHTML = `<option value="">${t("mk.pick_campaign")}</option>` +
+    campaigns.map(c => `<option value="${c.id}">${escapeHTML(c.campaign_name)}${c.month ? " (" + c.month + ")" : ""}</option>`).join("");
+  if (prev && campaigns.find(c => String(c.id) === prev)) sel.value = prev;
+}
+
+async function selectCampaign() {
+  const cid = document.getElementById("campSelect").value;
+  if (!cid) {
+    document.getElementById("dashboard").classList.add("hidden");
+    document.getElementById("emptyState").classList.remove("hidden");
+    document.getElementById("campActions").classList.add("hidden");
+    return;
+  }
+  currentCamp = campaigns.find(c => String(c.id) === cid);
+  document.getElementById("campActions").classList.remove("hidden");
+  try {
+    dashboard = await api(`/api/marketing/campaigns/${cid}/dashboard`);
+    document.getElementById("emptyState").classList.add("hidden");
+    document.getElementById("dashboard").classList.remove("hidden");
+    renderDashboard();
+  } catch (e) { toastError(e); }
+}
+
+// ─── Dashboard rendering — orchestrator ─────────────────────────────────
+function renderDashboard() {
+  if (!dashboard) return;
+  renderOverview();
+  renderScenarios();
+  renderMaster();
+  renderDynamicBySpend();
+  renderTimePacing();
+  renderSummary();
+  renderPeriodTable();
+  renderHealthCheck();
+  renderInsights();
+  renderActionPlan();
+  renderTemplates();
+  renderFormulas();
+  applyLang(true);
+}
+
+// 1) Overview
+function renderOverview() {
+  const o = dashboard.overview;
+  const items = [
+    { label: t("mk.ov_name"),             value: escapeHTML(o.campaign_name || "—") },
+    { label: t("mk.ov_avg_price"),        value: egp(o.avg_unit_price) },
+    { label: t("mk.ov_gross_commission"), value: egp(o.gross_commission) },
+    { label: t("mk.ov_tax"),              value: fmtPct(o.tax_rate) },
+    { label: t("mk.ov_net_commission"),   value: egp(o.net_commission) },
+    { label: t("mk.ov_close_rate"),       value: fmtPct(o.expected_close_rate) },
+    { label: t("mk.ov_budget"),           value: egp(o.campaign_budget) },
+  ];
+  document.getElementById("ovOverview").innerHTML = items.map(i => `
+    <div class="mkt-overview-tile">
+      <div class="mkt-overview-label">${i.label}</div>
+      <div class="mkt-overview-value">${i.value}</div>
+    </div>`).join("");
+}
+
+// 2) Scenarios
+function renderScenarios() {
+  const SC = ["conservative", "balanced", "aggressive"];
+  const recommended = dashboard.recommended;
+  document.getElementById("ovScenarios").innerHTML = SC.map(key => {
+    const s = dashboard.scenarios[key];
+    const isRec = key === recommended;
+    return `
+      <div class="mkt-scenario-card${isRec ? ' is-recommended' : ''}"
+           style="cursor:pointer;transition:border-color .2s"
+           onclick="selectScenario('${key}')"
+           title="${t('mk.scenario_pick_tooltip')}">
+        <div class="mkt-scenario-head">
+          <div class="mkt-scenario-title">${t("mk.scenario_" + key)}</div>
+          ${isRec
+            ? `<span class="badge badge-excellent">${t("mk.recommended_label")}</span>`
+            : `<span style="font-size:11px;color:var(--text-muted)">${t("mk.scenario_pick_hint")}</span>`}
+        </div>
+        <dl class="mkt-scenario-stats">
+          <div><dt>${t("mk.target_cpd")}</dt><dd>${egp(s.target_cost_per_deal)}</dd></div>
+          <div><dt>${t("mk.target_cpl")}</dt><dd>${egp(s.target_cpl)}</dd></div>
+          <div><dt>${t("mk.exp_leads")}</dt><dd>${fmt0(s.expected_leads)}</dd></div>
+          <div><dt>${t("mk.target_deals")}</dt><dd>${fmt0(s.target_deals)}</dd></div>
+        </dl>
+      </div>`;
+  }).join("");
+  document.getElementById("ovRecommended").innerHTML = `
+    <span class="material-symbols-outlined" aria-hidden="true">recommend</span>
+    <span><strong>${t("mk.recommended_label")}:</strong> ${t("mk.scenario_" + recommended)}</span>`;
+}
+
+async function selectScenario(key) {
+  if (!currentCamp || key === dashboard.recommended) return;
+  try {
+    await api(`/api/marketing/campaigns/${currentCamp.id}`, {
+      method: "PUT",
+      body: {
+        campaign_name:       currentCamp.campaign_name,
+        avg_unit_price:      currentCamp.avg_unit_price,
+        campaign_budget:     currentCamp.campaign_budget,
+        commission_input:    currentCamp.commission_input,
+        commission_type:     currentCamp.commission_type,
+        expected_close_rate: parseFloat(currentCamp.expected_close_rate) * 100,
+        tax_rate:            parseFloat(currentCamp.tax_rate) * 100,
+        start_date:          currentCamp.start_date || null,
+        end_date:            currentCamp.end_date   || null,
+        review_date:         currentCamp.review_date || null,
+        recommended_scenario: key,
+      }
+    });
+    currentCamp.recommended_scenario = key;
+    toast("تم اختيار السيناريو: " + key, "success");
+    await selectCampaign();   // refresh dashboard
+  } catch (e) { toastError(e); }
+}
+
+// 3) Master Funnel
+function renderMaster() {
+  const m = dashboard.master;
+  const rows = [
+    [t("mk.ov_budget"),               egp(m.budget),              t("mk.unit_egp")],
+    [t("mk.kpi_cpl"),                 egp(m.target_cpl),          t("mk.unit_egp")],
+    [t("mk.kpi_cost_per_deal"),       egp(m.target_cost_per_deal), t("mk.unit_egp")],
+    [t("mk.kpi_close_rate"),          fmtPct(m.target_close_rate), "%"],
+    [t("mk.kpi_leads"),               fmt0(m.target_leads),       t("mk.unit_count")],
+    [t("mk.kpi_qualified_leads"),     fmt0(m.target_qualified_leads), t("mk.unit_count")],
+    [t("mk.kpi_meetings"),            fmt0(m.target_meetings),    t("mk.unit_meet")],
+    [t("mk.kpi_follow_ups"),          fmt0(m.target_follow_ups),  t("mk.unit_count")],
+    [t("mk.kpi_deals"),               fmt0(m.target_deals),       t("mk.unit_deals")],
+    [t("mk.kpi_revenue_proxy"),       egp(m.target_revenue_proxy), t("mk.unit_egp")],
+  ];
+  document.getElementById("ovMaster").innerHTML =
+    rows.map(([k,v,u]) => `<tr><td>${k}</td><td><strong>${v}</strong></td><td class="text-muted">${u}</td></tr>`).join("");
+}
+
+// 4) Dynamic by Spend
+function renderDynamicBySpend() {
+  const d = dashboard.dynamic_by_spend;
+  const a = dashboard.actuals || {};
+  document.getElementById("ovDynamicHeadline").innerHTML = `
+    <div class="mkt-headline-card">
+      <div class="mkt-headline-label">${t("mk.dyn_spend_progress")}</div>
+      <div class="mkt-headline-value">${fmtPct(d.spend_progress)}</div>
+    </div>
+    <div class="mkt-headline-card">
+      <div class="mkt-headline-label">${t("mk.tp_actual_spend")}</div>
+      <div class="mkt-headline-value">${egp(d.actual_spend)}</div>
+    </div>`;
+
+  // Inline actuals form — always open. Hiding it behind a toggle made
+  // marketing users assume the values weren't editable; the brief was
+  // explicitly "make it dynamic and simple" so the form stays visible
+  // and pre-populated whether actuals exist or not.
+  const card     = document.getElementById("actualsInlineCard");
+  const titleEl  = document.getElementById("actualsInlineTitle");
+  const hintEl   = document.getElementById("actualsInlineHint");
+  const savedHint= document.getElementById("actualsSavedHint");
+  const body     = document.getElementById("actualsInlineBody");
+  card.style.display = "";
+  body.style.display = "";
+  hintEl.textContent = t("mk.actuals_form_hint");
+  document.getElementById("a_spend").value = a.actual_spend  || "";
+  document.getElementById("a_leads").value = a.actual_leads  || "";
+  document.getElementById("a_ql").value    = a.actual_qualified_leads || "";
+  document.getElementById("a_meet").value  = a.actual_meetings || "";
+  document.getElementById("a_fu").value    = a.actual_follow_ups || "";
+  document.getElementById("a_deals").value = a.actual_deals  || "";
+  titleEl.textContent = d.actuals_present
+    ? t("mk.update_actuals_title")
+    : t("mk.enter_actuals_title");
+  savedHint.style.display = d.actuals_present ? "" : "none";
+
+  if (!d.actuals_present) {
+    document.getElementById("ovDynamicVolume").innerHTML =
+      `<tr><td colspan="7" class="text-muted text-center" style="padding:18px">${t("mk.no_actuals_hint")}</td></tr>`;
+    document.getElementById("ovDynamicEfficiency").innerHTML =
+      `<tr><td colspan="4" class="text-muted text-center" style="padding:18px">${t("mk.no_actuals_hint")}</td></tr>`;
+    return;
+  }
+
+  document.getElementById("ovDynamicVolume").innerHTML = d.rows.map(r => `
+    <tr>
+      <td>${t("mk.kpi_" + r.kpi)}</td>
+      <td>${r.kpi === "revenue_proxy" ? egp(r.full_target) : fmt0(r.full_target)}</td>
+      <td class="text-muted">${fmtPct(r.spend_progress)}</td>
+      <td>${r.kpi === "revenue_proxy" ? egp(r.dynamic_target) : fmt0(r.dynamic_target)}</td>
+      <td><strong>${r.kpi === "revenue_proxy" ? egp(r.actual) : fmt0(r.actual)}</strong></td>
+      <td>${r.achievement == null ? "—" : fmtPct(r.achievement)}</td>
+      <td>${statusBadge(r.status)}</td>
+    </tr>`).join("");
+
+  document.getElementById("ovDynamicEfficiency").innerHTML = d.efficiency_rows.map(r => {
+    const isPct = r.kpi === "close_rate";
+    const fmtFn = isPct ? fmtPct : egp;
+    return `
+    <tr>
+      <td>${t("mk.kpi_" + r.kpi)}</td>
+      <td>${fmtFn(r.target)}</td>
+      <td><strong>${fmtFn(r.actual)}</strong></td>
+      <td>${statusBadge(r.status)}</td>
+    </tr>`;
+  }).join("");
+}
+
+// 5) Time Pacing
+function renderTimePacing() {
+  const tp = dashboard.time_pacing;
+  if (!tp.available) {
+    document.getElementById("ovTimeHeadline").innerHTML =
+      `<div class="mkt-empty-hint"><span class="material-symbols-outlined">event_busy</span> ${t("mk.no_dates_hint")}</div>`;
+    document.getElementById("ovTimeRows").innerHTML =
+      `<tr><td colspan="7" class="text-muted text-center" style="padding:18px">${t("mk.no_data_yet")}</td></tr>`;
+    return;
+  }
+  document.getElementById("ovTimeHeadline").innerHTML = `
+    <div class="mkt-headline-card"><div class="mkt-headline-label">${t("mk.tp_total_days")}</div><div class="mkt-headline-value">${fmt0(tp.total_days)}</div></div>
+    <div class="mkt-headline-card"><div class="mkt-headline-label">${t("mk.tp_elapsed_days")}</div><div class="mkt-headline-value">${fmt0(tp.elapsed_days)}</div></div>
+    <div class="mkt-headline-card"><div class="mkt-headline-label">${t("mk.tp_time_progress")}</div><div class="mkt-headline-value">${fmtPct(tp.time_progress)}</div></div>
+    <div class="mkt-headline-card"><div class="mkt-headline-label">${t("mk.tp_planned_spend")}</div><div class="mkt-headline-value">${egp(tp.planned_spend)}</div></div>
+    <div class="mkt-headline-card"><div class="mkt-headline-label">${t("mk.tp_actual_spend")}</div><div class="mkt-headline-value">${egp(tp.actual_spend)}</div></div>
+    <div class="mkt-headline-card"><div class="mkt-headline-label">${t("mk.tp_spend_pacing")}</div><div class="mkt-headline-value">${statusBadge(tp.spend_pacing_status)}</div></div>
+  `;
+  document.getElementById("ovTimeRows").innerHTML = tp.rows.map(r => `
+    <tr>
+      <td>${t("mk.kpi_" + r.kpi)}</td>
+      <td>${r.kpi === "revenue_proxy" ? egp(r.full_target) : fmt0(r.full_target)}</td>
+      <td class="text-muted">${fmtPct(r.time_progress)}</td>
+      <td>${r.kpi === "revenue_proxy" ? egp(r.time_target) : fmt0(r.time_target)}</td>
+      <td><strong>${r.kpi === "revenue_proxy" ? egp(r.actual) : fmt0(r.actual)}</strong></td>
+      <td>${r.achievement == null ? "—" : fmtPct(r.achievement)}</td>
+      <td>${statusBadge(r.status)}</td>
+    </tr>`).join("");
+}
+
+// 6) Actual vs Target Summary
+function renderSummary() {
+  const rows = dashboard.summary || [];
+  document.getElementById("ovSummary").innerHTML = rows.map(r => `
+    <tr>
+      <td>${t("mk.kpi_" + r.kpi)}</td>
+      <td>${r.kpi === "revenue_proxy" ? egp(r.full_target) : fmt0(r.full_target)}</td>
+      <td>${r.kpi === "revenue_proxy" ? egp(r.dynamic_target_by_spend) : fmt0(r.dynamic_target_by_spend)}</td>
+      <td>${r.time_based_target == null ? "—" : (r.kpi === "revenue_proxy" ? egp(r.time_based_target) : fmt0(r.time_based_target))}</td>
+      <td><strong>${r.kpi === "revenue_proxy" ? egp(r.actual) : fmt0(r.actual)}</strong></td>
+      <td>${statusBadge(r.status_vs_spend)}</td>
+    </tr>`).join("");
+}
+
+// 7) Period Performance
+function switchPeriodTab(kind, btn) {
+  activePeriodKind = kind;
+  document.querySelectorAll(".tab-bar .tab-btn").forEach(b => {
+    const isActive = b === btn;
+    b.classList.toggle("active", isActive);
+    b.setAttribute("aria-selected", String(isActive));
+    b.tabIndex = isActive ? 0 : -1;
+  });
+  renderPeriodTable();
+}
+
+function renderPeriodTable() {
+  const rows = (dashboard.periods && dashboard.periods[activePeriodKind]) || [];
+  const host = document.getElementById("ovPeriodTable");
+  if (!rows.length) {
+    host.innerHTML = `<div class="empty-state" style="padding:30px"><div class="text-muted">${t("mk.no_periods")}</div></div>`;
+    return;
+  }
+  host.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>${t("mk.period_label")}</th>
+          <th>${t("mk.actual_spend")}</th>
+          <th>${t("mk.kpi_leads")}</th>
+          <th>${t("mk.kpi_qualified_leads")}</th>
+          <th>${t("mk.kpi_meetings")}</th>
+          <th>${t("mk.kpi_follow_ups")}</th>
+          <th>${t("mk.kpi_deals")}</th>
+          <th>${t("mk.kpi_cpl")}</th>
+          <th>${t("mk.kpi_cost_per_deal")}</th>
+          <th>${t("mk.kpi_close_rate")}</th>
+          <th>${t("mk.kpi_revenue_proxy")}</th>
+          <th>${t("mk.delta_vs_prev")}</th>
+          <th></th>
+        </tr></thead>
+        <tbody>${rows.map(r => `
+          <tr>
+            <td><strong>${escapeHTML(r.label)}</strong></td>
+            <td>${egp(r.spend)}</td>
+            <td>${fmt0(r.leads)}</td>
+            <td>${fmt0(r.qualified_leads)}</td>
+            <td>${fmt0(r.meetings)}</td>
+            <td>${fmt0(r.follow_ups)}</td>
+            <td>${fmt0(r.deals)}</td>
+            <td>${egp(r.cpl)}</td>
+            <td>${egp(r.cost_per_deal)}</td>
+            <td>${fmtPct(r.close_rate)}</td>
+            <td>${egp(r.revenue_proxy)}</td>
+            <td class="text-muted">${r.delta_spend_vs_prev == null ? "—" : fmtPct(r.delta_spend_vs_prev)}</td>
+            <td>
+              <div class="flex gap-1">
+                <button class="btn btn-sm" onclick="openPeriodForm('${r.kind}', ${r.index})">${t("common.edit")}</button>
+                <button class="btn btn-sm btn-danger" onclick="deletePeriod('${r.kind}', ${r.index}, '${escapeHTML(r.label)}')">${t("common.delete")}</button>
+              </div>
+            </td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// 8) 5-Day Health Check
+function renderHealthCheck() {
+  const h = dashboard.health_check_5day;
+  if (!h.rows.length) {
+    document.getElementById("ovHealthSummary").innerHTML = "";
+    document.getElementById("ovHealthRows").innerHTML =
+      `<tr><td colspan="5" class="text-muted text-center" style="padding:18px">${t("mk.no_periods")}</td></tr>`;
+    return;
+  }
+  document.getElementById("ovHealthSummary").innerHTML = `
+    <div class="mkt-headline-card">
+      <div class="mkt-headline-label">${t("mk.last_window")}</div>
+      <div class="mkt-headline-value">${verdictBadge(h.last_window)}</div>
+    </div>`;
+  document.getElementById("ovHealthRows").innerHTML = h.rows.map(r => `
+    <tr>
+      <td><strong>${escapeHTML(r.period)}</strong></td>
+      <td>${statusBadge(r.cpl_status)}</td>
+      <td>${statusBadge(r.cpd_status)}</td>
+      <td>${statusBadge(r.close_rate_status)}</td>
+      <td>${verdictBadge(r.verdict)}</td>
+    </tr>`).join("");
+}
+
+// 9) Insights — surface fixed-template bullets based on observed status flags
+function renderInsights() {
+  const out = [];
+  const d = dashboard.dynamic_by_spend;
+  const tp = dashboard.time_pacing;
+  const h = dashboard.health_check_5day;
+  const a = dashboard.actuals;
+
+  if (tp.available && (tp.spend_pacing_status === "critical" || tp.spend_pacing_status === "warning")) {
+    out.push(tp.actual_spend > tp.planned_spend ? "mk.insight_spend_high" : "mk.insight_spend_low");
+  }
+
+  if (a.present) {
+    const cpl = d.efficiency_rows.find(r => r.kpi === "cpl");
+    if (cpl) out.push(cpl.status === "on_track" ? "mk.insight_cpl_ok" : "mk.insight_cpl_high");
+    const cpd = d.efficiency_rows.find(r => r.kpi === "cost_per_deal");
+    if (cpd && (cpd.status === "warning" || cpd.status === "critical")) out.push("mk.insight_cpd_high");
+    const cr = d.efficiency_rows.find(r => r.kpi === "close_rate");
+    if (cr) out.push(cr.status === "on_track" ? "mk.insight_close_ok" : "mk.insight_close_low");
+    const leads = d.rows.find(r => r.kpi === "leads");
+    if (leads && (leads.status === "warning" || leads.status === "critical")) out.push("mk.insight_leads_low");
+    const meet = d.rows.find(r => r.kpi === "meetings");
+    if (meet && (meet.status === "warning" || meet.status === "critical")) out.push("mk.insight_meetings_low");
+    const deals = d.rows.find(r => r.kpi === "deals");
+    if (deals) out.push(deals.status === "on_track" ? "mk.insight_deals_strong" : "mk.insight_deals_lag");
+  }
+
+  if (h.last_window === "critical") out.push("mk.insight_5day_critical");
+
+  if (tp.available && a.present) {
+    const deals = d.rows.find(r => r.kpi === "deals");
+    if (deals && deals.achievement != null && deals.achievement < tp.time_progress * 0.95) {
+      out.push("mk.insight_time_lag");
+    }
+  }
+
+  const seen = new Set();
+  const insightsHTML = out.filter(k => !seen.has(k) && seen.add(k)).slice(0, 10)
+    .map(k => `<li>${t(k)}</li>`).join("");
+  document.getElementById("ovInsights").innerHTML = insightsHTML
+    || `<li class="text-muted">${t("mk.no_data_yet")}</li>`;
+}
+
+// 10) Action Plan — fixed 5-block content; spec wants every block visible
+function renderActionPlan() {
+  const blocks = [
+    { title: "mk.action_high_cpl_title",     items: ["mk.action_high_cpl_1","mk.action_high_cpl_2","mk.action_high_cpl_3"], icon: "trending_up" },
+    { title: "mk.action_low_close_title",    items: ["mk.action_low_close_1","mk.action_low_close_2","mk.action_low_close_3"], icon: "handshake" },
+    { title: "mk.action_low_leads_title",    items: ["mk.action_low_leads_1","mk.action_low_leads_2","mk.action_low_leads_3"], icon: "person_add" },
+    { title: "mk.action_low_meetings_title", items: ["mk.action_low_meetings_1","mk.action_low_meetings_2","mk.action_low_meetings_3"], icon: "groups" },
+    { title: "mk.action_weak_5day_title",    items: ["mk.action_weak_5day_1","mk.action_weak_5day_2","mk.action_weak_5day_3"], icon: "warning" },
+  ];
+  document.getElementById("ovActions").innerHTML = blocks.map(b => `
+    <div class="mkt-action-card">
+      <div class="mkt-action-head">
+        <span class="material-symbols-outlined" aria-hidden="true">${b.icon}</span>
+        <span>${t(b.title)}</span>
+      </div>
+      <ol>${b.items.map(k => `<li>${t(k)}</li>`).join("")}</ol>
+    </div>`).join("");
+}
+
+// 11) Templates + 12) Formulas — reference content
+function renderTemplates() {
+  const sections = [
+    { label: t("mk.actuals_entry"),
+      cols: [t("mk.actual_spend"), t("mk.actual_leads"), t("mk.actual_ql"), t("mk.actual_meetings"), t("mk.actual_fu"), t("mk.actual_deals")] },
+    { label: t("mk.period_daily"),
+      cols: [t("mk.period_start"), t("mk.actual_spend"), t("mk.actual_leads"), t("mk.actual_ql"), t("mk.actual_meetings"), t("mk.actual_fu"), t("mk.actual_deals")] },
+    { label: t("mk.period_5_day"),
+      cols: [t("mk.period_label"), t("mk.actual_spend"), t("mk.actual_leads"), t("mk.actual_ql"), t("mk.actual_meetings"), t("mk.actual_fu"), t("mk.actual_deals")] },
+    { label: t("mk.period_weekly"),
+      cols: [t("mk.period_label"), t("mk.actual_spend"), t("mk.actual_leads"), t("mk.actual_ql"), t("mk.actual_meetings"), t("mk.actual_fu"), t("mk.actual_deals")] },
+    { label: t("mk.period_monthly"),
+      cols: [t("mk.period_label"), t("mk.actual_spend"), t("mk.actual_leads"), t("mk.actual_ql"), t("mk.actual_meetings"), t("mk.actual_fu"), t("mk.actual_deals")] },
+  ];
+  document.getElementById("ovTemplates").innerHTML = sections.map(s => `
+    <div class="form-section-title" style="margin-top:12px">${s.label}</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>${s.cols.map(c => `<th>${c}</th>`).join("")}</tr></thead>
+        <tbody><tr>${s.cols.map(() => `<td class="text-muted">—</td>`).join("")}</tr></tbody>
+      </table>
+    </div>`).join("");
+}
+
+function renderFormulas() {
+  const items = [
+    "mk.formula_gross", "mk.formula_net", "mk.formula_cpd",
+    "mk.formula_cpl", "mk.formula_exp_leads", "mk.formula_exp_deals",
+    "mk.formula_actual_cpl", "mk.formula_actual_cpd", "mk.formula_actual_cr", "mk.formula_actual_rev",
+  ];
+  document.getElementById("ovFormulas").innerHTML = `
+    <ul class="mkt-formulas">${items.map(k => `<li>${t(k)}</li>`).join("")}</ul>`;
+}
+
+// ─── Actuals entry ──────────────────────────────────────────────────────
+async function saveActuals() {
+  if (!currentCamp) return;
+  const body = {
+    actual_spend:           parseFloat(document.getElementById("a_spend").value)  || 0,
+    actual_leads:           parseInt(document.getElementById("a_leads").value)    || 0,
+    actual_qualified_leads: parseInt(document.getElementById("a_ql").value)       || 0,
+    actual_meetings:        parseInt(document.getElementById("a_meet").value)     || 0,
+    actual_follow_ups:      parseInt(document.getElementById("a_fu").value)       || 0,
+    actual_deals:           parseInt(document.getElementById("a_deals").value)    || 0,
+  };
+  try {
+    await api(`/api/marketing/campaigns/${currentCamp.id}/actuals`, { method: "PUT", body });
+    toast(t("mk.save_actuals") + " ✓", "success");
+    await selectCampaign();   // refresh full dashboard
+  } catch (e) { toastError(e); }
+}
+
+// ─── Campaign create / edit ─────────────────────────────────────────────
+function _formClear() {
+  ["f_name","f_price","f_budget","f_comm","f_cr","f_tax","f_start_date","f_end_date","f_review_date"]
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+  document.getElementById("f_ctype").value = "percentage";
+  document.getElementById("f_tax").value = "19";
+}
+
+function openNew() {
+  editingCampId = null;
+  document.getElementById("campModalTitle").textContent = t("mk.modal_title_new");
+  _formClear();
+  applyLang(true);
+  openModal("campModal");
+}
+
+function editCurrent() {
+  if (!currentCamp) return;
+  editingCampId = currentCamp.id;
+  document.getElementById("campModalTitle").textContent = t("mk.modal_title_edit");
+  document.getElementById("f_name").value   = currentCamp.campaign_name || "";
+  document.getElementById("f_price").value  = currentCamp.avg_unit_price || "";
+  document.getElementById("f_budget").value = currentCamp.campaign_budget || "";
+  document.getElementById("f_comm").value   = currentCamp.commission_input || "";
+  document.getElementById("f_ctype").value  = currentCamp.commission_type || "percentage";
+  // tax_rate / expected_close_rate are stored as decimals — display as whole percent
+  document.getElementById("f_cr").value     = currentCamp.expected_close_rate != null ? Number(currentCamp.expected_close_rate) * 100 : "";
+  document.getElementById("f_tax").value    = currentCamp.tax_rate != null ? Math.round(Number(currentCamp.tax_rate) * 100) : 19;
+  document.getElementById("f_start_date").value  = currentCamp.start_date || "";
+  document.getElementById("f_end_date").value    = currentCamp.end_date   || "";
+  document.getElementById("f_review_date").value = currentCamp.review_date || "";
+  applyLang(true);
+  openModal("campModal");
+}
+
+async function saveCampaign() {
+  const body = {
+    campaign_name:       document.getElementById("f_name").value.trim(),
+    avg_unit_price:      parseFloat(document.getElementById("f_price").value) || 0,
+    campaign_budget:     parseFloat(document.getElementById("f_budget").value) || 0,
+    commission_input:    parseFloat(document.getElementById("f_comm").value) || 0,
+    commission_type:     document.getElementById("f_ctype").value,
+    expected_close_rate: parseFloat(document.getElementById("f_cr").value) || 0,
+    tax_rate:            parseFloat(document.getElementById("f_tax").value) || 19,
+    start_date:          document.getElementById("f_start_date").value || null,
+    end_date:            document.getElementById("f_end_date").value || null,
+    review_date:         document.getElementById("f_review_date").value || null,
+  };
+  try {
+    if (editingCampId) {
+      await api(`/api/marketing/campaigns/${editingCampId}`, { method: "PUT", body });
+    } else {
+      const res = await api("/api/marketing/campaigns", { method: "POST", body });
+      currentCamp = { id: res.id };
+    }
+    closeModal("campModal");
+    toast(t("common.saved"), "success");
+    await loadCampaigns();
+  } catch (e) { toastError(e); }
+}
+
+let _pendingDelete = null;
+function deleteCurrent() {
+  if (!currentCamp) return;
+  _pendingDelete = currentCamp.id;
+  document.getElementById("campDeleteName").textContent = currentCamp.campaign_name || "";
+  openModal("campDeleteModal");
+}
+async function confirmDelete() {
+  if (!_pendingDelete) { closeModal("campDeleteModal"); return; }
+  try {
+    await api(`/api/marketing/campaigns/${_pendingDelete}`, { method: "DELETE" });
+    closeModal("campDeleteModal");
+    toast(t("common.deleted"), "success");
+    _pendingDelete = null; currentCamp = null; dashboard = null;
+    await loadCampaigns();
+  } catch (e) { toastError(e); }
+}
+
+// ─── Period entry ──────────────────────────────────────────────────────
+function openPeriodForm(kind, idx) {
+  if (!currentCamp) return;
+  editingPeriod = (kind && idx) ? { kind, index: idx } : null;
+  document.getElementById("periodModalTitle").textContent =
+    editingPeriod ? t("mk.edit_period") : t("mk.add_period");
+
+  const ids = ["pf_index","pf_label","pf_start","pf_end","pf_spend","pf_leads","pf_qleads","pf_meetings","pf_fup","pf_deals","pf_notes"];
+  ids.forEach(i => { const el = document.getElementById(i); if (el) el.value = ""; });
+
+  if (editingPeriod) {
+    const r = (dashboard.periods[kind] || []).find(x => x.index === idx);
+    if (r) {
+      document.getElementById("pf_kind").value     = r.kind;
+      document.getElementById("pf_index").value    = r.index;
+      document.getElementById("pf_label").value    = r.label || "";
+      document.getElementById("pf_start").value    = r.start || "";
+      document.getElementById("pf_end").value      = r.end || "";
+      document.getElementById("pf_spend").value    = r.spend || "";
+      document.getElementById("pf_leads").value    = r.leads || "";
+      document.getElementById("pf_qleads").value   = r.qualified_leads || "";
+      document.getElementById("pf_meetings").value = r.meetings || "";
+      document.getElementById("pf_fup").value      = r.follow_ups || "";
+      document.getElementById("pf_deals").value    = r.deals || "";
+      document.getElementById("pf_notes").value    = r.notes || "";
+    }
+  } else {
+    document.getElementById("pf_kind").value = activePeriodKind;
+    const existing = (dashboard.periods[activePeriodKind] || []).map(p => p.index);
+    document.getElementById("pf_index").value = (existing.length ? Math.max(...existing) + 1 : 1);
+  }
+  applyLang(true);
+  openModal("periodModal");
+}
+
+async function savePeriod() {
+  if (!currentCamp) return;
+  const body = {
+    period_kind:     document.getElementById("pf_kind").value,
+    period_index:    parseInt(document.getElementById("pf_index").value, 10) || 0,
+    period_label:    document.getElementById("pf_label").value.trim(),
+    period_start:    document.getElementById("pf_start").value || null,
+    period_end:      document.getElementById("pf_end").value || null,
+    spend:           parseFloat(document.getElementById("pf_spend").value) || 0,
+    leads:           parseInt(document.getElementById("pf_leads").value, 10) || 0,
+    qualified_leads: parseInt(document.getElementById("pf_qleads").value, 10) || 0,
+    meetings:        parseInt(document.getElementById("pf_meetings").value, 10) || 0,
+    follow_ups:      parseInt(document.getElementById("pf_fup").value, 10) || 0,
+    deals:           parseInt(document.getElementById("pf_deals").value, 10) || 0,
+    notes:           document.getElementById("pf_notes").value || null,
+  };
+  if (!body.period_label || body.period_index < 1) {
+    toast(t("errors.required_fields_missing"), "error");
+    return;
+  }
+  try {
+    await api(`/api/marketing/campaigns/${currentCamp.id}/periods`, { method: "POST", body });
+    closeModal("periodModal");
+    toast(t("common.saved"), "success");
+    await selectCampaign();   // refresh dashboard
+  } catch (e) { toastError(e); }
+}
+
+function deletePeriod(kind, idx, label) {
+  pendingPeriodDelete = { kind, idx };
+  document.getElementById("periodDeleteLabel").textContent = label || "";
+  openModal("periodDeleteModal");
+}
+
+async function confirmPeriodDelete() {
+  if (!pendingPeriodDelete || !currentCamp) { closeModal("periodDeleteModal"); return; }
+  const { kind, idx } = pendingPeriodDelete;
+  try {
+    await api(`/api/marketing/campaigns/${currentCamp.id}/periods/${kind}/${idx}`, { method: "DELETE" });
+    closeModal("periodDeleteModal");
+    toast(t("common.deleted"), "success");
+    pendingPeriodDelete = null;
+    await selectCampaign();
+  } catch (e) { toastError(e); }
+}
+
+// ─── Lifecycle ─────────────────────────────────────────────────────────
+function onLangChange() { if (dashboard) renderDashboard(); }
+function onThemeChange() { if (dashboard) renderDashboard(); }
+
+loadCampaigns();
+
+</script>
+{% endblock %}
