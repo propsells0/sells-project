@@ -38,8 +38,9 @@ const I18N = {
 
     /* ─── common ─── */
     "common.save": "حفظ",
-    "common.cancel": "إلغاء",
-    "common.delete": "حذف",
+    "common.cancel":  "إلغاء",
+    "common.delete":  "حذف",
+    "common.deleted": "تم الحذف",
     "common.edit": "تعديل",
     "common.close": "إغلاق",
     "common.search": "بحث",
@@ -970,6 +971,8 @@ const I18N = {
     "crm.marketing.col.actions":     "إجراءات",
     "crm.marketing.action.open":     "فتح",
     "crm.marketing.action.upload":   "رفع",
+    "crm.marketing.action.delete":   "حذف الحملة",
+    "crm.marketing.confirm_delete":  "هل أنت متأكد؟ سيتم حذف الحملة ومسح كل بياناتها (الليدز، الأحداث، التقارير) بشكل نهائي ولا يمكن التراجع.",
 
     "crm.stages.NO_ANSWER":    "لم يرد",
     "crm.stages.FOLLOWING":    "متابعة",
@@ -1135,8 +1138,9 @@ const I18N = {
 
     /* ─── common ─── */
     "common.save": "Save",
-    "common.cancel": "Cancel",
-    "common.delete": "Delete",
+    "common.cancel":  "Cancel",
+    "common.delete":  "Delete",
+    "common.deleted": "deleted",
     "common.edit": "Edit",
     "common.close": "Close",
     "common.search": "Search",
@@ -2067,6 +2071,8 @@ const I18N = {
     "crm.marketing.col.actions":     "Actions",
     "crm.marketing.action.open":     "Open",
     "crm.marketing.action.upload":   "Upload",
+    "crm.marketing.action.delete":   "Delete Campaign",
+    "crm.marketing.confirm_delete":  "Are you sure? This will permanently delete the campaign and all its data (leads, events, reports). This cannot be undone.",
 
     "crm.stages.NO_ANSWER":    "No Answer",
     "crm.stages.FOLLOWING":    "Following",

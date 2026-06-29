@@ -117,6 +117,7 @@
   }
 </style>
 <script>
+const _IS_ADMIN = {{ 'true' if user.role == 'admin' else 'false' }};
 let crmCampaignList = [];
 let crmUploadTargetId = null;
 let crmPollTimer = null;
@@ -189,12 +190,25 @@ function renderCrmCards() {
         <button class="btn btn-sm btn-primary" data-camp="${c.campaign_id}"
                 data-name="${escapeHtml(c.campaign_name)}"
                 data-i18n="crm.marketing.action.upload"></button>
+        ${_IS_ADMIN ? `<button class="btn btn-sm btn-danger" data-del-camp="${c.campaign_id}"
+                data-del-name="${escapeHtml(c.campaign_name)}"
+                data-i18n="crm.marketing.action.delete"></button>` : ""}
       </div>
     `;
     card.querySelector("button[data-camp]").addEventListener("click", e => {
       const btn = e.currentTarget;
       crmOpenUpload(parseInt(btn.getAttribute("data-camp"), 10), btn.getAttribute("data-name"));
     });
+    const delBtn = card.querySelector("button[data-del-camp]");
+    if (delBtn) {
+      delBtn.addEventListener("click", e => {
+        const btn = e.currentTarget;
+        crmConfirmDeleteCampaign(
+          parseInt(btn.getAttribute("data-del-camp"), 10),
+          btn.getAttribute("data-del-name")
+        );
+      });
+    }
     wrap.appendChild(card);
   });
   applyLang(true);
@@ -315,6 +329,19 @@ function escapeHtml(s) {
   return String(s == null ? "" : s)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+// ─── Delete campaign ─────────────────────────────────────────────────
+function crmConfirmDeleteCampaign(campaignId, campaignName) {
+  const msg = (t("crm.marketing.confirm_delete") || "Delete this campaign?")
+    + "\n\n" + campaignName;
+  if (!confirm(msg)) return;
+  api(`/api/crm/campaigns/${campaignId}`, { method: "DELETE" })
+    .then(() => {
+      toast(campaignName + " — " + (t("common.deleted") || "deleted"), "success");
+      loadCrmSummary();
+    })
+    .catch(e => toastError(e));
 }
 
 // ─── Lifecycle ────────────────────────────────────────────────────────

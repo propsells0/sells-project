@@ -1673,3 +1673,45 @@ def list_uploads(campaign_id: int):
     finally:
         if conn is not None:
             conn.close()
+
+
+# ─── DELETE campaign ─────────────────────────────────────────────────────
+
+@crm_bp.route("/campaigns/<int:campaign_id>", methods=["DELETE"])
+@login_required
+@role_required("admin")
+@csrf_protect
+def delete_campaign(campaign_id: int):
+    """Permanently delete a campaign and all its data (leads, events,
+    assignments, KPIs, uploads, mappings). Cascades are enforced by FK
+    constraints in the DB so one DELETE on marketing_campaigns is enough.
+    Only admins can delete campaigns.
+    """
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT campaign_name FROM marketing_campaigns WHERE id = %s",
+                (campaign_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return error_response("not_found", 404)
+            campaign_name = row[0]
+            cur.execute(
+                "DELETE FROM marketing_campaigns WHERE id = %s",
+                (campaign_id,),
+            )
+        conn.commit()
+        log.info(
+            "Campaign %s (%r) deleted by user %s",
+            campaign_id, campaign_name, session.get("user_id"),
+        )
+        return jsonify({"ok": True, "campaign_name": campaign_name})
+    except Exception as e:
+        log.error("delete_campaign %s: %s", campaign_id, e)
+        return error_response("server", 500)
+    finally:
+        if conn is not None:
+            conn.close()
