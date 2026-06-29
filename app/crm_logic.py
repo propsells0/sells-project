@@ -753,19 +753,82 @@ def rebuild_lead_assignments(lead_id: int, conn) -> int:
 def rebuild_assignments_for_campaign(campaign_id: int, conn,
                                      affected_lead_ids=None) -> int:
     """Rebuild assignments for every lead in the campaign (or only the
-    provided subset). Returns total assignments written."""
-    with conn.cursor() as cur:
-        if affected_lead_ids is None:
-            cur.execute("SELECT id FROM leads WHERE campaign_id = %s", (campaign_id,))
-            lead_ids = [r[0] for r in cur.fetchall()]
-        else:
-            lead_ids = list(affected_lead_ids)
+    provided subset). Returns total assignments written.
 
-    total = 0
-    for lid in lead_ids:
-        total += rebuild_lead_assignments(lid, conn)
+    Pulls all events in one query, groups by lead_id in Python, then bulk
+    DELETE + bulk INSERT — three round-trips regardless of lead count.
+    """
+    import psycopg2.extras
+
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        if affected_lead_ids is not None:
+            lead_list = list(affected_lead_ids)
+            cur.execute(
+                """
+                SELECT id, lead_id, follow_date, sales_user_id,
+                       raw_sales_rep_name, campaign_id
+                FROM lead_events
+                WHERE lead_id = ANY(%s)
+                  AND is_voided = FALSE
+                  AND follow_date IS NOT NULL
+                ORDER BY lead_id, follow_date ASC, id ASC
+                """,
+                (lead_list,),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT le.id, le.lead_id, le.follow_date, le.sales_user_id,
+                       le.raw_sales_rep_name, le.campaign_id
+                FROM lead_events le
+                JOIN leads l ON l.id = le.lead_id
+                WHERE l.campaign_id = %s
+                  AND le.is_voided = FALSE
+                  AND le.follow_date IS NOT NULL
+                ORDER BY le.lead_id, le.follow_date ASC, le.id ASC
+                """,
+                (campaign_id,),
+            )
+        all_events = cur.fetchall()
+
+    by_lead: dict = {}
+    for ev in all_events:
+        by_lead.setdefault(ev["lead_id"], []).append(ev)
+
+    all_rows = []
+    for lead_id, events in by_lead.items():
+        for a in _assignments_from_events(events):
+            all_rows.append((
+                lead_id, campaign_id,
+                a["sales_user_id"], a["raw_sales_rep_name"], a["assignment_type"],
+                a["started_at"], a["ended_at"],
+            ))
+
+    with conn.cursor() as cur:
+        if affected_lead_ids is not None:
+            cur.execute(
+                "DELETE FROM lead_assignments WHERE lead_id = ANY(%s)",
+                (list(affected_lead_ids),),
+            )
+        else:
+            cur.execute(
+                "DELETE FROM lead_assignments WHERE campaign_id = %s",
+                (campaign_id,),
+            )
+        if all_rows:
+            psycopg2.extras.execute_values(
+                cur,
+                """
+                INSERT INTO lead_assignments
+                    (lead_id, campaign_id, sales_user_id, raw_sales_rep_name,
+                     assignment_type, started_at, ended_at)
+                VALUES %s
+                """,
+                all_rows,
+            )
+
     conn.commit()
-    return total
+    return len(all_rows)
 
 
 # ═══ Recalc — Sales KPIs ════════════════════════════════════════════════
@@ -1282,15 +1345,20 @@ def apply_stage_mapping_change(raw_stage: str, campaign_id_scope, conn) -> set:
             )
         rows = cur.fetchall()
 
-    for event_id, campaign_id, original_raw in rows:
-        new_stage = normalize_stage(original_raw, campaign_id=campaign_id, conn=conn)
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE lead_events SET normalized_stage = %s WHERE id = %s",
-                (new_stage, event_id),
-            )
-        affected.add(campaign_id)
+    # Group events by their computed new stage so we can batch-update all
+    # events with the same result in one statement instead of N round-trips.
+    by_new_stage: dict = {}
+    for event_id, camp_id, original_raw in rows:
+        new_stage = normalize_stage(original_raw, campaign_id=camp_id, conn=conn)
+        by_new_stage.setdefault(new_stage, []).append(event_id)
+        affected.add(camp_id)
 
+    with conn.cursor() as cur:
+        for new_stage, event_ids in by_new_stage.items():
+            cur.execute(
+                "UPDATE lead_events SET normalized_stage = %s WHERE id = ANY(%s)",
+                (new_stage, event_ids),
+            )
     conn.commit()
     return affected
 
@@ -1343,14 +1411,18 @@ def apply_sales_rep_mapping_change(raw_name: str, campaign_id_scope, conn) -> se
             )
         rows = cur.fetchall()
 
-    for event_id, campaign_id, original_raw in rows:
-        new_user_id = match_sales_user(original_raw, campaign_id, conn)
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE lead_events SET sales_user_id = %s WHERE id = %s",
-                (new_user_id, event_id),
-            )
-        affected.add(campaign_id)
+    # Batch by resolved user_id — reduces N round-trips to K (unique users).
+    by_new_user: dict = {}
+    for event_id, camp_id, original_raw in rows:
+        new_user_id = match_sales_user(original_raw, camp_id, conn)
+        by_new_user.setdefault(new_user_id, []).append(event_id)
+        affected.add(camp_id)
 
+    with conn.cursor() as cur:
+        for new_user_id, event_ids in by_new_user.items():
+            cur.execute(
+                "UPDATE lead_events SET sales_user_id = %s WHERE id = ANY(%s)",
+                (new_user_id, event_ids),
+            )
     conn.commit()
     return affected

@@ -657,7 +657,7 @@ def get_tl_kpi(tl_user_id, month):
                     LEFT JOIN kpi_entries e
                       ON e.user_id = u.id AND e.month = %s
                     WHERE u.team_id = %s AND u.role = 'sales' AND u.active = true
-                    ORDER BY e.total_score DESC NULLS LAST, u.full_name ASC
+                    ORDER BY e.total_score DESC NULLS LAST, u.full_name ASC, e.id ASC
                 """, (month, team_id))
                 member_rows = [dict(r) for r in cur.fetchall()]
 

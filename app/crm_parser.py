@@ -69,24 +69,34 @@ def _cell_text(v) -> str:
     return str(v).strip()
 
 
-def _parse_follow_date(v) -> Optional[datetime]:
-    """Accept a real datetime/date from Excel, or a string in common formats."""
+def _parse_follow_date(v, _fmt_cache=None) -> Optional[datetime]:
+    """Accept a real datetime/date from Excel, or a string in common formats.
+
+    _fmt_cache is a mutable dict shared across calls for one upload — once
+    a format succeeds, it's tried first on subsequent rows, cutting the
+    average number of strptime attempts from ~6 to 1.
+    """
     if v is None or v == "":
         return None
     if isinstance(v, datetime):
         return v
     if isinstance(v, date):
-        # Bare date → midnight. Keeps downstream code simple (everything is
-        # a datetime) without lying about a time the sheet didn't actually
-        # carry.
         return datetime.combine(v, time.min)
     if isinstance(v, str):
         s = v.strip()
         if not s:
             return None
+        if _fmt_cache is not None and _fmt_cache.get("fmt"):
+            try:
+                return datetime.strptime(s, _fmt_cache["fmt"])
+            except ValueError:
+                pass
         for fmt in _DATE_FORMATS:
             try:
-                return datetime.strptime(s, fmt)
+                result = datetime.strptime(s, fmt)
+                if _fmt_cache is not None:
+                    _fmt_cache["fmt"] = fmt
+                return result
             except ValueError:
                 continue
     return None
@@ -150,11 +160,13 @@ def _find_sheet_and_header(wb):
     )
 
     for ws in sheets:
-        all_rows = list(ws.iter_rows(values_only=True))
-        for row_idx, row in enumerate(all_rows):
+        # Stream rows lazily — stop scanning as soon as the header is found.
+        # The generator is already positioned past the header row so the
+        # caller consumes data rows without re-reading anything.
+        rows_gen = ws.iter_rows(values_only=True)
+        for row_idx, row in enumerate(rows_gen):
             if required_canons.issubset(_canons_in_row(row)):
-                # This row has ALL required columns — it's the header.
-                return ws, row, iter(all_rows[row_idx + 1:]), row_idx + 2
+                return ws, row, rows_gen, row_idx + 2
 
     raise ValueError(
         "No valid header row found in any sheet. "
@@ -197,7 +209,7 @@ def parse_crm_excel(file_stream, campaign_id: int, conn) -> dict:
     # come through as the cached value instead of "=SUM(...)".
     # read_only=False so _find_sheet_and_header can materialise all rows as a
     # list (read_only streaming iterators can't be rewound).
-    wb = load_workbook(file_stream, read_only=False, data_only=True)
+    wb = load_workbook(file_stream, read_only=True, data_only=True)
     if not wb.worksheets:
         raise ValueError("Workbook has no worksheets.")
 
@@ -216,6 +228,7 @@ def parse_crm_excel(file_stream, campaign_id: int, conn) -> dict:
     unmatched_reps: dict = {}    # norm → display
     unmatched_stages: dict = {}  # norm → display
     total_rows = 0
+    date_fmt_cache: dict = {}    # shared across rows to skip repeated strptime attempts
 
     last_client_name: Optional[str] = None
     last_mobile_normalized: Optional[str] = None
@@ -278,7 +291,7 @@ def parse_crm_excel(file_stream, campaign_id: int, conn) -> dict:
             # and "mahmoud amr" don't both show up in the warnings list.
             unmatched_reps.setdefault(normalize_sales_name(raw_rep), raw_rep)
 
-        follow_date = _parse_follow_date(raw_follow)
+        follow_date = _parse_follow_date(raw_follow, date_fmt_cache)
         if raw_follow not in (None, "") and follow_date is None:
             warnings.append(
                 f"Row {row_index}: follow_date {raw_follow!r} couldn't be parsed; stored as NULL."

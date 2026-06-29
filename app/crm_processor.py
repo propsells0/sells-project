@@ -76,70 +76,85 @@ def _process_upload(upload_id: int, file_bytes: bytes, campaign_id: int) -> None
         duplicate_events = 0
         leads_touched: set = set()
 
-        # ── Ingest row by row ────────────────────────────────────────────
-        # Each row is its own transaction (SAVEPOINT) so one malformed row
-        # can't poison the upload. The unique constraint on event_hash is
-        # the dedup mechanism — re-uploading the same sheet bumps
-        # duplicate_events, not new_events.
-        for row in rows:
-            try:
-                with conn.cursor() as cur:
-                    # 1. Get-or-create the lead.
-                    lead_id = _upsert_lead(cur, campaign_id, row)
-                    leads_touched.add(lead_id)
+        # ── Batch ingest ─────────────────────────────────────────────────
+        # Two-phase bulk approach: one execute_values for all leads, one for
+        # all events. Reduces N×2 round-trips to exactly 2 statements
+        # regardless of sheet size. ON CONFLICT handles both dedup and
+        # client_name backfill without extra logic.
+        import psycopg2.extras
 
-                    # 2. Compute event_hash and try to insert.
-                    event_hash = compute_event_hash(
-                        campaign_id=campaign_id,
-                        mobile=row["mobile"],
-                        follow_date=row["follow_date"],
-                        raw_sales_rep=row["raw_sales_rep_name"],
-                        normalized_stage=row["normalized_stage"],
-                        comment=row["comment"],
-                    )
+        with conn.cursor() as cur:
+            # Phase A: upsert all leads — get back (id, mobile) for every row
+            lead_data = [
+                (campaign_id, row["client_name"] or None, row["mobile"])
+                for row in rows
+            ]
+            returned_leads = psycopg2.extras.execute_values(
+                cur,
+                """
+                INSERT INTO leads (campaign_id, client_name, mobile)
+                VALUES %s
+                ON CONFLICT (campaign_id, mobile) DO UPDATE SET
+                    client_name = CASE
+                        WHEN leads.client_name IS NULL OR leads.client_name = ''
+                        THEN EXCLUDED.client_name
+                        ELSE leads.client_name
+                    END,
+                    updated_at = NOW()
+                RETURNING id, mobile
+                """,
+                lead_data,
+                fetch=True,
+            )
+            mobile_to_lead = {r[1]: r[0] for r in returned_leads}
 
-                    cur.execute(
-                        """
-                        INSERT INTO lead_events (
-                            lead_id, campaign_id, sales_user_id,
-                            raw_sales_rep_name, raw_stage, normalized_stage,
-                            follow_date, comment,
-                            source_upload_id, source_row_number, event_hash
-                        )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (event_hash) DO NOTHING
-                        RETURNING id
-                        """,
-                        (
-                            lead_id,
-                            campaign_id,
-                            row["sales_user_id"],
-                            row["raw_sales_rep_name"],
-                            row["raw_stage"],
-                            row["normalized_stage"],
-                            row["follow_date"],
-                            row["comment"],
-                            upload_id,
-                            row["row_number"],
-                            event_hash,
-                        ),
+            # Phase B: build event rows, skipping any with unknown mobiles
+            event_data = []
+            for row in rows:
+                lead_id = mobile_to_lead.get(row["mobile"])
+                if lead_id is None:
+                    warnings.append(
+                        f"Row {row.get('row_number')}: no lead_id resolved for mobile "
+                        f"{row['mobile']!r} — skipped."
                     )
-                    inserted = cur.fetchone()
-                    if inserted:
-                        new_events += 1
-                    else:
-                        duplicate_events += 1
-                conn.commit()
-            except Exception as row_exc:
-                # Rollback the bad row's work and keep going. The Postgres
-                # connection enters an aborted state on error, so the
-                # rollback is mandatory before the next row's INSERT.
-                conn.rollback()
-                warnings.append(
-                    f"Row {row.get('row_number')}: skipped — {type(row_exc).__name__}: {row_exc}"
+                    continue
+                leads_touched.add(lead_id)
+                event_hash = compute_event_hash(
+                    campaign_id=campaign_id,
+                    mobile=row["mobile"],
+                    follow_date=row["follow_date"],
+                    raw_sales_rep=row["raw_sales_rep_name"],
+                    normalized_stage=row["normalized_stage"],
+                    comment=row["comment"],
                 )
-                log.warning("CRM upload %s, row %s skipped: %s",
-                            upload_id, row.get("row_number"), row_exc)
+                event_data.append((
+                    lead_id, campaign_id, row["sales_user_id"],
+                    row["raw_sales_rep_name"], row["raw_stage"], row["normalized_stage"],
+                    row["follow_date"], row["comment"],
+                    upload_id, row["row_number"], event_hash,
+                ))
+
+            # Phase C: bulk insert — RETURNING id counts new vs duplicate
+            inserted_ids = psycopg2.extras.execute_values(
+                cur,
+                """
+                INSERT INTO lead_events (
+                    lead_id, campaign_id, sales_user_id,
+                    raw_sales_rep_name, raw_stage, normalized_stage,
+                    follow_date, comment,
+                    source_upload_id, source_row_number, event_hash
+                )
+                VALUES %s
+                ON CONFLICT (event_hash) DO NOTHING
+                RETURNING id
+                """,
+                event_data,
+                fetch=True,
+            )
+            new_events = len(inserted_ids)
+            duplicate_events = len(event_data) - new_events
+
+        conn.commit()
 
         # ── Recalc KPIs + Manager Intervention ──────────────────────────
         # Runs before the COMPLETED flip so the overview endpoint never
@@ -205,38 +220,6 @@ def _process_upload(upload_id: int, file_bytes: bytes, campaign_id: int) -> None
                 conn.close()
             except Exception:
                 pass
-
-
-def _upsert_lead(cur, campaign_id: int, row: dict) -> int:
-    """Find the lead row for (campaign, mobile) or create it. Returns id.
-
-    If the lead already exists with an empty client_name and this row
-    carries a non-empty one (continuation row of an earlier upload), we
-    backfill the name so future reports/timelines show something useful.
-    """
-    cur.execute(
-        "SELECT id, client_name FROM leads WHERE campaign_id = %s AND mobile = %s",
-        (campaign_id, row["mobile"]),
-    )
-    existing = cur.fetchone()
-    if existing:
-        lead_id, existing_name = existing
-        if (not existing_name) and row["client_name"]:
-            cur.execute(
-                "UPDATE leads SET client_name = %s, updated_at = NOW() WHERE id = %s",
-                (row["client_name"], lead_id),
-            )
-        return lead_id
-
-    cur.execute(
-        """
-        INSERT INTO leads (campaign_id, client_name, mobile)
-        VALUES (%s, %s, %s)
-        RETURNING id
-        """,
-        (campaign_id, row["client_name"] or None, row["mobile"]),
-    )
-    return cur.fetchone()[0]
 
 
 # ─── Status helpers ─────────────────────────────────────────────────────

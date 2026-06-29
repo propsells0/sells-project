@@ -668,6 +668,11 @@ def init_all_tables():
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_lead_events_sales_user ON lead_events(sales_user_id);")
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_lead_events_normalized_stage ON lead_events(normalized_stage);")
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_lead_events_follow_date ON lead_events(follow_date);")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_lead_events_is_voided ON lead_events(is_voided) WHERE is_voided = FALSE;")
+                cur.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_lead_events_raw_stage_lower "
+                    "ON lead_events(LOWER(TRIM(raw_stage)), campaign_id) WHERE is_voided = FALSE;"
+                )
 
                 # campaign_id NULL = global mapping (applies to every campaign
                 # unless an override exists). Per-campaign rows take precedence
@@ -749,6 +754,10 @@ def init_all_tables():
                 cur.execute(
                     "CREATE INDEX IF NOT EXISTS idx_intervention_priority "
                     "ON manager_intervention_flags(priority, status);"
+                )
+                cur.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_intervention_status "
+                    "ON manager_intervention_flags(status);"
                 )
 
                 # lead_assignments (P2) — one row per "this rep owned this

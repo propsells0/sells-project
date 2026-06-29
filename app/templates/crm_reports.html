@@ -255,12 +255,12 @@ async function crmDoUpload() {
     toastError(e); return;
   }
   crmPollTries = 0;
-  crmPollTimer = setInterval(() => crmPoll(uploadId), 2000);
+  crmPollTimer = setInterval(() => crmPoll(uploadId), 3000);
 }
 
 async function crmPoll(uploadId) {
   crmPollTries += 1;
-  if (crmPollTries > 60) {
+  if (crmPollTries > 100) {
     clearInterval(crmPollTimer); crmPollTimer = null;
     crmShowResult({ status: "FAILED", error_message: t("crm.upload.timeout") || "Timed out" });
     return;
@@ -271,8 +271,9 @@ async function crmPoll(uploadId) {
       clearInterval(crmPollTimer); crmPollTimer = null;
       crmShowResult(s);
     } else {
+      const elapsed = Math.round(crmPollTries * 3);
       document.getElementById("crmUploadProgress").textContent =
-        `${t("crm.upload.processing")} (${crmPollTries}/60)`;
+        `${t("crm.upload.processing")} (${elapsed}s)`;
     }
   } catch (e) {
     clearInterval(crmPollTimer); crmPollTimer = null;
